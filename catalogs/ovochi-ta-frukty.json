@@ -1,0 +1,12 @@
+{
+  "slug": "ovochi-ta-frukty",
+  "name": "Овочі та фрукти",
+  "emoji": "🍎",
+  "products": [
+    {"sku": "yabluko-gala", "name": "Яблука Гала", "description": "Хрумкі, соковиті та сонячно-солодкі", "price": 6890, "unit": "кг", "emoji": "🍎", "color": "peach", "stock": 42},
+    {"sku": "avokado-haas", "name": "Авокадо Хаас", "description": "Стигле, ніжне, з вершковим смаком", "price": 4290, "unit": "шт", "emoji": "🥑", "color": "sage", "stock": 18},
+    {"sku": "tomaty-cheri", "name": "Томати чері", "description": "Ароматні, солодкі, сонячні", "price": 8990, "unit": "уп", "emoji": "🍅", "color": "rose", "stock": 24},
+    {"sku": "morkva-moloda", "name": "Морква молода", "description": "Солодка, щойно з українського поля", "price": 3490, "unit": "кг", "emoji": "🥕", "color": "cream", "stock": 30},
+    {"sku": "polunytsia", "name": "Полуниця добірна", "description": "Запашна ягода з місцевої ферми", "price": 12990, "unit": "уп", "emoji": "🍓", "color": "pink", "stock": 12}
+  ]
+}

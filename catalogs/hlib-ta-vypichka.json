@@ -1,0 +1,11 @@
+{
+  "slug": "hlib-ta-vypichka",
+  "name": "Хліб та випічка",
+  "emoji": "🥖",
+  "products": [
+    {"sku": "khlib-zakvaska", "name": "Хліб на заквасці", "description": "Рум’яна скоринка, довга ферментація", "price": 7490, "unit": "шт", "emoji": "🍞", "color": "cream", "stock": 14},
+    {"sku": "kruasan-maslianyi", "name": "Круасан масляний", "description": "Повітряний, щойно з печі", "price": 3990, "unit": "шт", "emoji": "🥐", "color": "sun", "stock": 20},
+    {"sku": "baget-frantsuzkyi", "name": "Багет французький", "description": "Хрумкий зовні, м’який усередині", "price": 4890, "unit": "шт", "emoji": "🥖", "color": "peach", "stock": 11},
+    {"sku": "bunochka-koritsia", "name": "Булочка з корицею", "description": "Тепла, духмяна й така домашня", "price": 3590, "unit": "шт", "emoji": "🧁", "color": "pink", "stock": 8}
+  ]
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163f32">
+  <meta name="description" content="Свіжі продукти й зручне онлайн-замовлення у магазині «Прометей».">
+  <title>Прометей — свіжі продукти поруч</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="announcement">Доставляємо свіжі продукти щодня · Замовлення від 500 ₴ — безкоштовно</div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Прометей — на головну">
+      <span class="brand-mark">п</span>
+      <span class="brand-copy"><strong>прометей</strong><small>магазин добрих продуктів</small></span>
+    </a>
+    <div class="header-search">
+      <span aria-hidden="true">⌕</span>
+      <input id="search-input" type="search" placeholder="Знайти улюблені продукти…" aria-label="Пошук товарів">
+      <kbd>⌘ K</kbd>
+    </div>
+    <div class="header-actions">
+      <a class="header-link" href="#delivery"><span aria-hidden="true">⌖</span><span>Київ<br><small>Доставка сьогодні</small></span></a>
+      <a class="header-link account-link" href="/account" aria-label="Особистий кабінет покупця"><span aria-hidden="true">♙</span><span>Мій кабінет</span></a>
+      <button class="cart-button" id="open-cart" type="button" aria-label="Відкрити кошик">
+        <span aria-hidden="true">♧</span><span>Кошик</span><b id="cart-count">0</b>
+      </button>
+    </div>
+  </header>
+
+  <nav class="category-nav" aria-label="Категорії товарів">
+    <div class="category-nav-inner" id="category-nav">
+      <a class="category-link active" href="#catalog" data-category="all">Усі товари</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow"><span class="dot"></span> Смачно. Свіжо. По-сусідськи.</span>
+        <h1>Турбота про себе<br>починається <em>з простого.</em></h1>
+        <p>Добірні продукти від українських виробників — усе найкраще для вашого столу, з любов’ю відібране командою «Прометея».</p>
+        <a class="button button-light" href="#catalog">Обрати продукти <span aria-hidden="true">↗</span></a>
+        <div class="hero-proof"><span class="proof-avatars">О М І</span><span><strong>12 000+</strong> родин уже з нами</span><span class="proof-stars">★★★★★</span></div>
+      </div>
+      <div class="hero-art" aria-label="Добірка свіжих продуктів">
+        <div class="hero-sun"></div>
+        <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
+        <div class="hero-emoji hero-apple">🍎</div><div class="hero-emoji hero-tomato">🍅</div>
+        <div class="hero-emoji hero-carrot">🥕</div><div class="hero-emoji hero-bread">🥖</div>
+        <div class="hero-emoji hero-leaves">🥬</div><div class="hero-sticker">від<br>фермера</div>
+        <div class="hero-caption"><span class="hero-caption-icon">✳</span><span>Натуральне<br><small>щодня для вас</small></span></div>
+      </div>
+      <div class="hero-side-note">ВІДБИРАЄМО З ТУРБОТОЮ · З 2014 РОКУ</div>
+    </section>
+
+    <section class="benefit-strip" aria-label="Переваги">
+      <div><span class="benefit-icon">✳</span><span><strong>Свіже щодня</strong><small>від перевірених постачальників</small></span></div>
+      <div><span class="benefit-icon">⌁</span><span><strong>Доставка від 60 хв</strong><small>обережно й у зручний час</small></span></div>
+      <div><span class="benefit-icon">♡</span><span><strong>Турбота про кожного</strong><small>завжди готові допомогти</small></span></div>
+    </section>
+
+    <section class="catalog-section" id="catalog">
+      <div class="section-heading">
+        <div><span class="eyebrow">НА ВАШОМУ СТОЛІ</span><h2 id="catalog-heading">Обирайте з любов’ю</h2></div>
+        <span class="product-count" id="product-count"></span>
+      </div>
+      <div class="catalog-tabs" id="catalog-tabs"></div>
+      <div class="product-grid" id="product-grid" aria-live="polite"></div>
+      <div class="empty-state hidden" id="empty-state"><span>🧺</span><h3>Нічого не знайшли</h3><p>Спробуйте змінити запит або оберіть іншу категорію.</p></div>
+    </section>
+
+    <section class="delivery-banner" id="delivery">
+      <div class="delivery-icon">🚲</div><div><span class="eyebrow">ПОДБАЛИ ПРО ДОСТАВКУ</span><h2>Від наших полиць — прямо до ваших дверей.</h2><p>Дбайливо збираємо кожне замовлення. Безкоштовна доставка — від 500 ₴.</p></div>
+      <a class="button button-dark" href="#catalog">Обрати продукти <span aria-hidden="true">↗</span></a>
+      <div class="delivery-decoration">✳</div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand footer-brand" href="/"><span class="brand-mark">п</span><span class="brand-copy"><strong>прометей</strong><small>магазин добрих продуктів</small></span></a>
+    <p>Хороші продукти. Хороші люди. Хороший день.</p>
+    <div class="footer-meta"><span>© 2026 «Прометей»</span><a href="/account">Особистий кабінет ↗</a><a href="/admin">Кабінет команди ↗</a></div>
+  </footer>
+
+  <div class="overlay hidden" id="cart-overlay"></div>
+  <aside class="cart-drawer" id="cart-drawer" aria-label="Ваш кошик" aria-hidden="true">
+    <div class="drawer-header"><div><span class="eyebrow">ВАША ПОКУПКА</span><h2>Кошик <span id="drawer-count">(0)</span></h2></div><button class="icon-button" id="close-cart" type="button" aria-label="Закрити кошик">×</button></div>
+    <div class="cart-items" id="cart-items"></div>
+    <div class="cart-empty" id="cart-empty"><span>🧺</span><h3>Кошик поки порожній</h3><p>Додайте щось смачненьке — і ми все підготуємо.</p></div>
+    <div class="cart-footer hidden" id="cart-footer">
+      <div class="delivery-progress" id="delivery-progress"></div>
+      <div class="cart-total"><span>Разом</span><strong id="cart-total">0 ₴</strong></div>
+      <button class="button button-dark button-full" id="checkout-button" type="button">Оформити замовлення <span aria-hidden="true">↗</span></button>
+      <p class="secure-note">Оплата готівкою або карткою при отриманні</p>
+    </div>
+  </aside>
+
+  <div class="modal-backdrop hidden" id="checkout-modal">
+    <section class="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+      <div class="drawer-header"><div><span class="eyebrow">ЩЕ ТРОХИ — І ГОТОВО</span><h2 id="checkout-title">Оформлення</h2></div><button class="icon-button" id="close-checkout" type="button" aria-label="Закрити">×</button></div>
+      <form id="checkout-form">
+        <label>Як до вас звертатися?<input name="name" autocomplete="name" minlength="2" maxlength="100" placeholder="Ваше ім’я" required></label>
+        <label>Номер телефону<input name="phone" autocomplete="tel" type="tel" minlength="9" maxlength="20" placeholder="+380 00 000 00 00" required></label>
+        <label>Куди доставити?<textarea name="address" autocomplete="street-address" minlength="5" maxlength="200" rows="2" placeholder="Вулиця, будинок, квартира" required></textarea></label>
+        <div class="checkout-summary"><span>До сплати при отриманні</span><strong id="checkout-total">0 ₴</strong></div>
+        <p class="form-message" id="checkout-message" role="alert"></p>
+        <button class="button button-dark button-full" type="submit">Підтвердити замовлення <span aria-hidden="true">↗</span></button>
+      </form>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

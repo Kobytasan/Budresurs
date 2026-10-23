@@ -1,0 +1,11 @@
+{
+  "slug": "napoi",
+  "name": "Напої",
+  "emoji": "🍵",
+  "products": [
+    {"sku": "sik-yabluchnyi", "name": "Сік яблучний прямого віджиму", "description": "Сто відсотків яблук, жодного цукру", "price": 9990, "unit": "л", "emoji": "🧃", "color": "sun", "stock": 15},
+    {"sku": "kombucha-yahidna", "name": "Комбуча ягідна", "description": "Освіжаюча, натурального бродіння", "price": 6990, "unit": "пляшка", "emoji": "🫧", "color": "pink", "stock": 13},
+    {"sku": "voda-dzherelna", "name": "Вода джерельна", "description": "Чиста вода з карпатського джерела", "price": 3290, "unit": "л", "emoji": "💧", "color": "blue", "stock": 40},
+    {"sku": "chai-travyanyi", "name": "Чай трав’яний «Вечірній»", "description": "М’ята, меліса й чебрець із Карпат", "price": 11990, "unit": "уп", "emoji": "🍵", "color": "sage", "stock": 10}
+  ]
+}

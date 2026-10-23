@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163f32">
+  <title>Мій кабінет — Прометей</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/city.js" defer></script>
+  <script src="/account.js" defer></script>
+</head>
+<body class="customer-page">
+  <header class="admin-topbar">
+    <a class="brand" href="/"><span class="brand-mark">п</span><span class="brand-copy"><strong>прометей</strong><small>магазин добрих продуктів</small></span></a>
+    <a class="back-store-link" href="/">← До магазину</a>
+  </header>
+  <main class="customer-main">
+    <section class="customer-auth" id="customer-auth">
+      <div class="login-mark">♡</div>
+      <span class="eyebrow">ВАШ ОСОБИСТИЙ ПРОСТІР</span>
+      <h1 id="auth-title">Раді бачити знову</h1>
+      <p id="auth-intro">Увійдіть, щоб переглянути замовлення, покупки й квитанції.</p>
+      <div class="auth-switch" role="tablist" aria-label="Вхід або реєстрація">
+        <button class="auth-tab active" type="button" role="tab" aria-selected="true" data-auth-mode="login">Увійти</button>
+        <button class="auth-tab" type="button" role="tab" aria-selected="false" data-auth-mode="register">Створити кабінет</button>
+      </div>
+      <form id="customer-login-form">
+        <label>Електронна пошта<input name="email" type="email" autocomplete="email" maxlength="254" placeholder="name@example.com" required></label>
+        <label>Пароль<input name="password" type="password" autocomplete="current-password" maxlength="256" required></label>
+        <p class="form-message" id="login-message" role="alert"></p>
+        <button class="button button-dark button-full" type="submit">Увійти до кабінету <span aria-hidden="true">↗</span></button>
+      </form>
+      <form id="customer-register-form" class="hidden">
+        <label>Ваше ім’я<input name="name" autocomplete="name" minlength="2" maxlength="100" required></label>
+        <label>Електронна пошта<input name="email" type="email" autocomplete="email" maxlength="254" placeholder="name@example.com" required></label>
+        <label>Номер телефону<input name="phone" type="tel" autocomplete="tel" minlength="9" maxlength="20" placeholder="+380 00 000 00 00" required></label>
+        <label>Ваше місто<select name="city" data-city-select required></select></label>
+        <label>Створіть пароль<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><small>Щонайменше 12 символів — для безпеки ваших покупок.</small></label>
+        <p class="form-message" id="register-message" role="alert"></p>
+        <button class="button button-dark button-full" type="submit">Зареєструватися <span aria-hidden="true">↗</span></button>
+      </form>
+      <a class="login-back" href="/">← Повернутися до магазину</a>
+    </section>
+
+    <section class="customer-dashboard hidden" id="customer-dashboard">
+      <div class="customer-dashboard-heading">
+        <div><span class="eyebrow">ВАШ ОСОБИСТИЙ ПРОСТІР</span><h1>Вітаємо, <span id="customer-name"></span></h1><p id="customer-email"></p><p id="customer-city"></p></div>
+        <button class="button button-outline button-small" id="customer-logout" type="button">Вийти</button>
+      </div>
+      <div class="section-heading customer-orders-heading"><div><span class="eyebrow">ВАШІ ПОКУПКИ</span><h2>Історія замовлень</h2></div><a class="button button-dark" href="/">До покупок <span aria-hidden="true">↗</span></a></div>
+      <div class="customer-order-list" id="customer-orders"></div>
+      <div class="customer-empty hidden" id="customer-empty"><span>🧺</span><h2>Ваші покупки з’являться тут</h2><p>Оформлюйте замовлення, коли увійшли до кабінету, — і зберігайте всі квитанції в одному місці.</p><a class="button button-dark" href="/">Обрати продукти <span aria-hidden="true">↗</span></a></div>
+    </section>
+  </main>
+  <footer class="admin-footer"><a href="/">Прометей</a><span>Дякуємо, що обираєте нас.</span></footer>
+  <section class="receipt-print" id="receipt-print" aria-label="Квитанція замовлення"></section>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "slug": "miaso-ta-ptytsia",
+  "name": "М’ясо та птиця",
+  "emoji": "🍗",
+  "products": [
+    {"sku": "file-kurky", "name": "Філе куряче охолоджене", "description": "Ніжне філе від українського виробника", "price": 18990, "unit": "кг", "emoji": "🍗", "color": "peach", "stock": 16},
+    {"sku": "indychka-file", "name": "Філе індички", "description": "Дієтичне, свіже, добірне", "price": 27990, "unit": "кг", "emoji": "🥩", "color": "rose", "stock": 9},
+    {"sku": "kovbaska-domashnia", "name": "Ковбаски домашні", "description": "З пряними травами, ручна робота", "price": 21990, "unit": "уп", "emoji": "🌭", "color": "cream", "stock": 7},
+    {"sku": "yaitsa-silsky", "name": "Яйця від вільних курей", "description": "Добірні яйця з сімейної ферми", "price": 8490, "unit": "10 шт", "emoji": "🥚", "color": "sun", "stock": 23}
+  ]
+}
