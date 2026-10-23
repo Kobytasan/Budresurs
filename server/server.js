@@ -3,6 +3,7 @@ import pkg from 'pg';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -21,7 +22,94 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// 1. Тестовий роут для перевірки бази
+// Автоматичне створення таблиць та заповнення з каталогів при старті
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        sku VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        category_name VARCHAR(100) NOT NULL,
+        price INTEGER NOT NULL,
+        unit VARCHAR(50) NOT NULL,
+        stock INTEGER NOT NULL,
+        description TEXT,
+        color VARCHAR(50),
+        visual VARCHAR(50),
+        emoji VARCHAR(10)
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255),
+        phone VARCHAR(50),
+        city VARCHAR(100),
+        address TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255),
+        phone VARCHAR(50) UNIQUE,
+        city VARCHAR(100)
+      );
+    `);
+
+    // Перевіряємо, чи є товари в базі, якщо немає — завантажуємо з JSON-файлів
+    const check = await pool.query('SELECT COUNT(*) FROM products');
+    if (parseInt(check.rows[0].count) === 0) {
+      const catalogFiles = [
+        'hlib-ta-vypychka.json',
+        'miaso-ta-pytysia.json',
+        'molochni-produkty.json',
+        'napoi.json',
+        'ovochi-ta-frukty.json',
+        'smacholiki.json'
+      ];
+
+      for (const file of catalogFiles) {
+        try {
+          const filePath = path.join(__dirname, '../catalogs', file);
+          const data = await fs.readFile(filePath, 'utf-8');
+          const products = JSON.parse(data);
+          for (const p of products) {
+            await pool.query(
+              `INSERT INTO products (sku, name, category, category_name, price, unit, stock, description, color, visual, emoji)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+               ON CONFLICT (sku) DO NOTHING;`,
+              [
+                p.sku,
+                p.name,
+                p.category,
+                p.category_name,
+                p.price,
+                p.unit,
+                p.stock,
+                p.description,
+                p.color,
+                p.visual,
+                p.emoji
+              ]
+            );
+          }
+        } catch (err) {
+          console.error(`Помилка завантаження файлу каталогу ${file}:`, err);
+        }
+      }
+      console.log('Базу даних успішно заповнено товарами з JSON-файлів.');
+    }
+  } catch (err) {
+    console.error('Помилка ініціалізації бази даних:', err);
+  }
+}
+
+// 1. Тестовий роут
 app.get('/api/test', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
@@ -32,7 +120,7 @@ app.get('/api/test', async (req, res) => {
   }
 });
 
-// 2. Отримання списку продуктів з бази даних
+// 2. Отримання списку продуктів
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products');
@@ -43,33 +131,52 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// 3. Створення замовлення
-app.post('/api/orders', async (req, res) => {
-  const { name, phone, city, address, items } = req.body;
+// 3. Реєстрація / оновлення покупця
+app.post('/api/customer/register', async (req, res) => {
+  const { name, phone, city } = req.body;
   try {
-    // Тут додається логіка створення замовлення у вашій базі даних
-    // Наприклад, зберігаємо замовлення і повертаємо його ID
+    const result = await pool.query(
+      `INSERT INTO customers (name, phone, city) 
+       VALUES ($1, $2, $3) 
+       ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name, city = EXCLUDED.city 
+       RETURNING *`,
+      [name, phone, city]
+    );
+    res.json({ success: true, customer: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Не вдалося зареєструвати користувача' });
+  }
+});
+
+// 4. Створення замовлення
+app.post('/api/orders', async (req, res) => {
+  const { name, phone, city, address } = req.body;
+  try {
     const orderResult = await pool.query(
       'INSERT INTO orders (name, phone, city, address, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING id',
       [name, phone, city, address]
     );
-    const orderId = orderResult.rows[0].id;
-    res.json({ success: true, order_id: orderId });
+    res.json({ success: true, order_id: orderResult.rows[0].id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Не вдалося оформити замовлення' });
   }
 });
 
-// 4. Роздаємо статичні файли фронтенду з папки dist
+// 5. Роздача статичних файлів фронтенду
 app.use(express.static(path.join(__dirname, '../dist')));
 
-// 5. Універсальний роутинг для React (ЗАВЖДИ МАЄ БУТИ В САМОМУ КІНЦІ!)
+// 6. Універсальний роутинг для React (ЗАВЖДИ В САМОМУ КІНЦІ!)
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Сервер успішно запущено на порту ${PORT}`);
+
+// Ініціалізація БД і запуск сервера
+initDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Сервер успішно запущено на порту ${PORT}`);
+  });
 });
