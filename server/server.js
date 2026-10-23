@@ -272,6 +272,40 @@ async function initDB() {
       [category.slug, category.name],
     )
   }
+  const legacyProductReplacements = [
+    {
+      sku: 'MEAT-01',
+      oldName: 'Куряче філе охолоджене',
+      name: 'Фарш яловичий охолоджений',
+      description: 'Свіжий фарш із добірної яловичини.',
+      emoji: '🥩',
+      color: 'rose',
+    },
+    {
+      sku: 'YOG-02',
+      oldName: 'Йогурт натуральний',
+      name: 'Кефір домашній 2,5%',
+      description: 'Ніжний кисломолочний напій щоденного приготування.',
+      emoji: '🥛',
+      color: 'blue',
+    },
+    {
+      sku: 'DRINK-01',
+      oldName: 'Сік яблучний натуральний',
+      name: 'Лимонад домашній',
+      description: 'Освіжаючий лимонад із натурального лимона.',
+      emoji: '🍋',
+      color: 'yellow',
+    },
+  ]
+  for (const product of legacyProductReplacements) {
+    await pool.query(
+      `UPDATE products
+       SET name = $1, description = $2, emoji = $3, color = $4, visual = ''
+       WHERE sku = $5 AND name = $6`,
+      [product.name, product.description, product.emoji, product.color, product.sku, product.oldName],
+    )
+  }
 
   const directorUsername = process.env.PROMETEY_ADMIN_USERNAME || 'director'
   const adminPassword = process.env.PROMETEY_ADMIN_PASSWORD || ''
