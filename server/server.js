@@ -90,24 +90,28 @@ app.get('/api/test', async (req, res) => {
   res.json({ success: true });
 });
 
-// 2. Продукти
+// 2. Продукти (ЗАХИЩЕНИЙ РОУТ — завжди повертає масив)
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products');
+    if (!result.rows || result.rows.length === 0) {
+      return res.json(INITIAL_PRODUCTS);
+    }
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: 'Помилка завантаження товарів' });
+    console.error('Помилка завантаження товарів з БД:', err);
+    res.json(INITIAL_PRODUCTS); // Резервний варіант, щоб фронтенд не падаляв
   }
 });
 
-// 3. Міста доставки (додано)
+// 3. Міста доставки
 app.get('/api/cities', async (req, res) => {
   res.json(['Київ', 'Львів', 'Харків', 'Одеса', 'Дніпро']);
 });
 
-// 4. Поточний користувач / кабінет (додано)
+// 4. Поточний користувач / кабінет
 app.get('/api/me', async (req, res) => {
-  res.json(null); // або дані авторизованого покупця
+  res.json(null);
 });
 
 // 5. Реєстрація покупця
@@ -141,7 +145,7 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-// 7. Статика та роутинг
+// 7. Статика та роутинг (ЗАВЖДИ В САМОМУ КІНЦІ)
 app.use(express.static(path.join(__dirname, '../dist')));
 
 app.get(/(.*)/, (req, res) => {
