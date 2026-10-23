@@ -250,8 +250,10 @@ async function initDB() {
 
   const catalogDir = path.join(rootDir, 'catalogs')
   const files = (await fs.readdir(catalogDir)).filter((file) => file.endsWith('.json')).sort()
+  const categories = []
   for (const file of files) {
     const catalog = JSON.parse(await fs.readFile(path.join(catalogDir, file), 'utf8'))
+    categories.push({ slug: catalog.slug, name: catalog.name })
     for (const product of catalog.products) {
       await pool.query(
         `INSERT INTO products
@@ -261,6 +263,14 @@ async function initDB() {
           catalog.name, product.unit, product.emoji, product.color, product.visual || '', product.stock],
       )
     }
+  }
+  for (const category of categories) {
+    await pool.query(
+      `UPDATE products
+       SET category = $1, category_name = $2
+       WHERE category_name = $2 AND category <> $1`,
+      [category.slug, category.name],
+    )
   }
 
   const directorUsername = process.env.PROMETEY_ADMIN_USERNAME || 'director'
