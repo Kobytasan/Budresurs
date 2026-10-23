@@ -64,6 +64,16 @@ function readFavorites(): string[] {
   }
 }
 
+function responseArray<T>(payload: unknown, key: string): T[] {
+  const value = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+    ? (payload as Record<string, unknown>)[key]
+    : undefined
+  if (!Array.isArray(value)) {
+    throw new Error(`Відповідь API не містить коректного списку «${key}».`)
+  }
+  return value as T[]
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
@@ -81,21 +91,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshProducts = useCallback(async () => {
-    const result = await api<{ products: Product[] }>('/api/products')
-    setProducts(result.products)
-    setProductsError('')
-    setProductsLoading(false)
+    try {
+      const result = await api<unknown>('/api/products')
+      setProducts(responseArray<Product>(result, 'products'))
+      setProductsError('')
+    } catch (error) {
+      setProductsError(error instanceof Error ? error.message : 'Не вдалося оновити товари.')
+    } finally {
+      setProductsLoading(false)
+    }
   }, [])
 
   useEffect(() => {
     let active = true
     void Promise.all([
-      api<{ products: Product[] }>('/api/products'),
-      api<{ cities: string[] }>('/api/cities'),
+      api<unknown>('/api/products'),
+      api<unknown>('/api/cities'),
     ]).then(([productResult, cityResult]) => {
       if (!active) return
-      setProducts(productResult.products)
-      setCities(cityResult.cities)
+      setProducts(responseArray<Product>(productResult, 'products'))
+      setCities(responseArray<string>(cityResult, 'cities'))
       setProductsLoading(false)
     }).catch((error: unknown) => {
       if (!active) return
@@ -103,9 +118,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProductsLoading(false)
     })
     const interval = window.setInterval(() => {
-      void refreshProducts().catch((error: unknown) => {
-        setProductsError(error instanceof Error ? error.message : 'Не вдалося оновити товари.')
-      })
+      void refreshProducts()
     }, 15_000)
     return () => {
       active = false

@@ -6,7 +6,7 @@ import { ProductCard, SectionHeader, useProductCategories } from '../components/
 import { useStore } from '../contexts/StoreContext'
 
 export function HomePage() {
-  const { products, cities } = useStore()
+  const { products, cities, productsError, refreshProducts } = useStore()
   const categories = useProductCategories(products)
   const outOfStock = products.filter((product) => product.stock === 0).length
 
@@ -28,6 +28,14 @@ export function HomePage() {
           <div className="hero-visual-caption"><Leaf size={18} /> Свіжий вибір для родини</div>
         </div>
       </section>
+      {productsError && (
+        <div className="page-width notice notice-error" role="alert">
+          {productsError}
+          <button className="text-button" type="button" onClick={() => void refreshProducts()}>
+            Спробувати ще
+          </button>
+        </div>
+      )}
       <section className="metrics-strip" aria-label="Каталог">
         <div><strong>{products.length}</strong><span>позицій у каталозі</span></div>
         <div><strong>{categories.length}</strong><span>категорій товарів</span></div>

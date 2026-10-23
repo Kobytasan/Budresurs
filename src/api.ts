@@ -12,9 +12,17 @@ export async function api<T>(
     },
   })
   const contentType = response.headers.get('content-type') || ''
-  const payload = contentType.includes('application/json')
-    ? await response.json() as unknown
-    : await response.text()
+  if (!contentType.includes('application/json')) {
+    const error = new Error(
+      response.ok
+        ? 'Сервер API повернув сторінку замість даних. Перевірте, що хостинг направляє /api/ до server.py.'
+        : `Сервер API повернув HTTP ${response.status} без JSON-відповіді.`,
+    ) as ApiError
+    error.status = response.status
+    throw error
+  }
+
+  const payload: unknown = await response.json()
 
   if (!response.ok) {
     const message =
