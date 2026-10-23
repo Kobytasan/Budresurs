@@ -3,7 +3,6 @@ import pkg from 'pg';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -22,7 +21,18 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Автоматичне створення таблиць та заповнення з каталогів при старті
+// Стандартні товари магазину «Прометей» (щоб не залежати від файлів на диску)
+const INITIAL_PRODUCTS = [
+  { sku: 'MILK-01', name: 'Фермерське молоко 2.5%', category: 'molochni-produkty', category_name: 'Молочні продукти', price: 4200, unit: 'л', stock: 25, description: 'Свіже натуральне молоко з ферми.', color: 'green', visual: 'milk-churn', emoji: '🥛' },
+  { sku: 'YOG-02', name: 'Йогурт натуральний', category: 'molochni-produkty', category_name: 'Молочні продукти', price: 3500, unit: 'шт', stock: 18, description: 'Густий та корисний йогурт без добавок.', color: 'pink', visual: 'yogurt-cup', emoji: '🥄' },
+  { sku: 'BREAD-01', name: 'Хліб пшеничний домашній', category: 'hlib-ta-vypychka', category_name: 'Хліб та випічка', price: 2800, unit: 'шт', stock: 15, description: 'Свіжоспечений хліб з хрусткою скоринкою.', color: 'amber', visual: 'default', emoji: '🍞' },
+  { sku: 'MEAT-01', name: 'Куряче філе охолоджене', category: 'miaso-ta-pytysia', category_name: 'М’ясо та птиця', price: 16500, unit: 'кг', stock: 10, description: 'Ніжне куряче філе високої якості.', color: 'red', visual: 'default', emoji: '🍗' },
+  { sku: 'FRUIT-01', name: 'Яблука українські', category: 'ovochi-ta-frukty', category_name: 'Овочі та фрукти', price: 3200, unit: 'кг', stock: 40, description: 'Соковиті та солодкі садові яблука.', color: 'green', visual: 'default', emoji: '🍎' },
+  { sku: 'DRINK-01', name: 'Сік яблучний натуральний', category: 'napoi', category_name: 'Напої', price: 5500, unit: 'л', stock: 20, description: '100% натуральний сік без цукру.', color: 'yellow', visual: 'default', emoji: '🧃' },
+  { sku: 'SWEET-01', name: 'Мед квітковий', category: 'smacholiki', category_name: 'Смаколики', price: 12000, unit: 'упак', stock: 12, description: 'Ароматний натуральний мед з пасіки.', color: 'amber', visual: 'default', emoji: '🍯' }
+];
+
+// Автоматичне створення таблиць та заповнення даними при старті
 async function initDB() {
   try {
     await pool.query(`
@@ -61,48 +71,18 @@ async function initDB() {
       );
     `);
 
-    // Перевіряємо, чи є товари в базі, якщо немає — завантажуємо з JSON-файлів
+    // Додаємо початкові товари, якщо таблиця порожня
     const check = await pool.query('SELECT COUNT(*) FROM products');
     if (parseInt(check.rows[0].count) === 0) {
-      const catalogFiles = [
-        'hlib-ta-vypychka.json',
-        'miaso-ta-pytysia.json',
-        'molochni-produkty.json',
-        'napoi.json',
-        'ovochi-ta-frukty.json',
-        'smacholiki.json'
-      ];
-
-      for (const file of catalogFiles) {
-        try {
-          const filePath = path.join(__dirname, '../catalogs', file);
-          const data = await fs.readFile(filePath, 'utf-8');
-          const products = JSON.parse(data);
-          for (const p of products) {
-            await pool.query(
-              `INSERT INTO products (sku, name, category, category_name, price, unit, stock, description, color, visual, emoji)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-               ON CONFLICT (sku) DO NOTHING;`,
-              [
-                p.sku,
-                p.name,
-                p.category,
-                p.category_name,
-                p.price,
-                p.unit,
-                p.stock,
-                p.description,
-                p.color,
-                p.visual,
-                p.emoji
-              ]
-            );
-          }
-        } catch (err) {
-          console.error(`Помилка завантаження файлу каталогу ${file}:`, err);
-        }
+      for (const p of INITIAL_PRODUCTS) {
+        await pool.query(
+          `INSERT INTO products (sku, name, category, category_name, price, unit, stock, description, color, visual, emoji)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           ON CONFLICT (sku) DO NOTHING;`,
+          [p.sku, p.name, p.category, p.category_name, p.price, p.unit, p.stock, p.description, p.color, p.visual, p.emoji]
+        );
       }
-      console.log('Базу даних успішно заповнено товарами з JSON-файлів.');
+      console.log('Базу даних успішно заповнено початковими товарами.');
     }
   } catch (err) {
     console.error('Помилка ініціалізації бази даних:', err);
@@ -120,7 +100,7 @@ app.get('/api/test', async (req, res) => {
   }
 });
 
-// 2. Отримання списку продуктів
+// 2. Отримання списку продуктів (СУВОРО ПЕРЕД СТАТИККОЮ!)
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products');
@@ -131,7 +111,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// 3. Реєстрація / оновлення покупця
+// 3. Реєстрація покупця
 app.post('/api/customer/register', async (req, res) => {
   const { name, phone, city } = req.body;
   try {
@@ -174,7 +154,6 @@ app.get(/(.*)/, (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Ініціалізація БД і запуск сервера
 initDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Сервер успішно запущено на порту ${PORT}`);
