@@ -106,17 +106,17 @@ export function StaffPage() {
     if (!user) return
     setError('')
     try {
-      if (activeTab === 'overview' || activeTab === 'finance') {
+      if (activeTab === 'overview' && user.role === 'inventory') {
+        const result = await api<{ products: ApiProduct[] }>('/api/admin/products')
+        setProducts(result.products)
+      }
+      if ((activeTab === 'overview' && user.role !== 'inventory') || activeTab === 'finance') {
         const [overviewResult, orderResult] = await Promise.all([
           api<Overview>('/api/admin/overview'),
           api<{ orders: AdminOrder[] }>('/api/admin/orders'),
         ])
         setOverview(overviewResult)
         setOrders(orderResult.orders)
-      }
-      if (activeTab === 'overview' && user.role === 'inventory') {
-        const result = await api<{ products: ApiProduct[] }>('/api/admin/products')
-        setProducts(result.products)
       }
       if (activeTab === 'inventory') {
         const result = await api<{ products: ApiProduct[]; suppliers: { id: number; name: string }[] }>('/api/admin/products')
