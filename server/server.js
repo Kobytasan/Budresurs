@@ -21,7 +21,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Стандартні товари магазину «Прометей» (щоб не залежати від файлів на диску)
 const INITIAL_PRODUCTS = [
   { sku: 'MILK-01', name: 'Фермерське молоко 2.5%', category: 'molochni-produkty', category_name: 'Молочні продукти', price: 4200, unit: 'л', stock: 25, description: 'Свіже натуральне молоко з ферми.', color: 'green', visual: 'milk-churn', emoji: '🥛' },
   { sku: 'YOG-02', name: 'Йогурт натуральний', category: 'molochni-produkty', category_name: 'Молочні продукти', price: 3500, unit: 'шт', stock: 18, description: 'Густий та корисний йогурт без добавок.', color: 'pink', visual: 'yogurt-cup', emoji: '🥄' },
@@ -32,7 +31,6 @@ const INITIAL_PRODUCTS = [
   { sku: 'SWEET-01', name: 'Мед квітковий', category: 'smacholiki', category_name: 'Смаколики', price: 12000, unit: 'упак', stock: 12, description: 'Ароматний натуральний мед з пасіки.', color: 'amber', visual: 'default', emoji: '🍯' }
 ];
 
-// Автоматичне створення таблиць та заповнення даними при старті
 async function initDB() {
   try {
     await pool.query(`
@@ -71,7 +69,6 @@ async function initDB() {
       );
     `);
 
-    // Додаємо початкові товари, якщо таблиця порожня
     const check = await pool.query('SELECT COUNT(*) FROM products');
     if (parseInt(check.rows[0].count) === 0) {
       for (const p of INITIAL_PRODUCTS) {
@@ -82,36 +79,38 @@ async function initDB() {
           [p.sku, p.name, p.category, p.category_name, p.price, p.unit, p.stock, p.description, p.color, p.visual, p.emoji]
         );
       }
-      console.log('Базу даних успішно заповнено початковими товарами.');
     }
   } catch (err) {
     console.error('Помилка ініціалізації бази даних:', err);
   }
 }
 
-// 1. Тестовий роут
+// 1. Тест
 app.get('/api/test', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT NOW()');
-    res.json({ success: true, time: result.rows[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Помилка підключення до бази даних' });
-  }
+  res.json({ success: true });
 });
 
-// 2. Отримання списку продуктів (СУВОРО ПЕРЕД СТАТИККОЮ!)
+// 2. Продукти
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products');
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Не вдалося завантажити товари' });
+    res.status(500).json({ error: 'Помилка завантаження товарів' });
   }
 });
 
-// 3. Реєстрація покупця
+// 3. Міста доставки (додано)
+app.get('/api/cities', async (req, res) => {
+  res.json(['Київ', 'Львів', 'Харків', 'Одеса', 'Дніпро']);
+});
+
+// 4. Поточний користувач / кабінет (додано)
+app.get('/api/me', async (req, res) => {
+  res.json(null); // або дані авторизованого покупця
+});
+
+// 5. Реєстрація покупця
 app.post('/api/customer/register', async (req, res) => {
   const { name, phone, city } = req.body;
   try {
@@ -124,12 +123,11 @@ app.post('/api/customer/register', async (req, res) => {
     );
     res.json({ success: true, customer: result.rows[0] });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: 'Не вдалося зареєструвати користувача' });
   }
 });
 
-// 4. Створення замовлення
+// 6. Замовлення
 app.post('/api/orders', async (req, res) => {
   const { name, phone, city, address } = req.body;
   try {
@@ -139,15 +137,13 @@ app.post('/api/orders', async (req, res) => {
     );
     res.json({ success: true, order_id: orderResult.rows[0].id });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: 'Не вдалося оформити замовлення' });
   }
 });
 
-// 5. Роздача статичних файлів фронтенду
+// 7. Статика та роутинг
 app.use(express.static(path.join(__dirname, '../dist')));
 
-// 6. Універсальний роутинг для React (ЗАВЖДИ В САМОМУ КІНЦІ!)
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
@@ -156,6 +152,6 @@ const PORT = process.env.PORT || 5000;
 
 initDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`Сервер успішно запущено на порту ${PORT}`);
+    console.log(`Сервер запущено на порту ${PORT}`);
   });
 });
