@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -19,6 +20,7 @@ DB_PATH = Path(
 ).expanduser().resolve()
 DB_DIR = DB_PATH.parent
 CATALOG_DIR = BASE_DIR / "catalogs"
+FRONTEND_DIST = BASE_DIR / "dist"
 SESSION_HOURS = 12
 PBKDF2_ITERATIONS = 310_000
 DEMO_MODE_ENABLED = os.environ.get("PROMETEY_DEMO_MODE", "1") == "1"
@@ -1293,51 +1295,50 @@ class StoreHandler(BaseHTTPRequestHandler):
         return self.send_json(201, {"id": user_id, "message": "Працівника додано."})
 
     def serve_static(self, path):
-        if path == "/":
-            relative = Path("home.html")
-        elif path in {"/index.html"}:
-            relative = Path("index.html")
-        elif path in {"/products", "/products.html"}:
-            relative = Path("products.html")
-        elif path == "/about":
-            relative = Path("about.html")
-        elif path == "/support":
-            relative = Path("support.html")
-        elif path == "/admin":
-            relative = Path("admin.html")
-        elif path == "/account":
-            relative = Path("account.html")
-        elif path == "/home.html":
-            relative = Path("home.html")
-        elif path.startswith("/catalogs/") and path.endswith(".json"):
-            relative = Path(path.lstrip("/"))
-        elif path in {
-            "/styles.css", "/app.js", "/admin.js", "/account.js",
-            "/city.js", "/support.js",
-        }:
+        if path.startswith("/api/"):
+            return self.send_json(404, {"error": "Маршрут не знайдено."})
+        if path.startswith("/catalogs/") and path.endswith(".json"):
+            base_dir = BASE_DIR
             relative = Path(path.lstrip("/"))
         else:
+            base_dir = FRONTEND_DIST
+            relative = Path("index.html") if path in {
+                "/", "/index.html", "/home.html", "/products", "/products.html",
+                "/about", "/support", "/admin", "/admin.html", "/account",
+                "/account.html",
+            } else Path(path.lstrip("/"))
+        root = base_dir.resolve()
+        file_path = (base_dir / relative).resolve()
+        if not file_path.is_relative_to(root):
             return self.send_json(404, {"error": "Сторінку не знайдено."})
-        file_path = (BASE_DIR / relative).resolve()
-        if not file_path.is_relative_to(BASE_DIR):
-            return self.send_json(404, {"error": "Сторінку не знайдено."})
+        if not file_path.is_file() and base_dir == FRONTEND_DIST:
+            accepts_html = "text/html" in self.headers.get("Accept", "")
+            has_extension = bool(Path(path).suffix)
+            if accepts_html and not has_extension:
+                file_path = (FRONTEND_DIST / "index.html").resolve()
+            else:
+                return self.send_json(404, {"error": "Файл не знайдено."})
         try:
             content = file_path.read_bytes()
         except FileNotFoundError:
+            if base_dir == FRONTEND_DIST:
+                return self.send_json(
+                    503,
+                    {"error": "Frontend ще не зібраний. Запустіть npm run build."},
+                )
             return self.send_json(404, {"error": "Файл не знайдено."})
-        content_type = (
-            "text/html; charset=utf-8"
-            if file_path.suffix == ".html"
-            else "text/css; charset=utf-8"
-            if file_path.suffix == ".css"
-            else "application/javascript; charset=utf-8"
-            if file_path.suffix == ".js"
-            else "application/json; charset=utf-8"
-        )
+        content_type, _ = mimetypes.guess_type(file_path.name)
+        content_type = content_type or "application/octet-stream"
+        if content_type.startswith(("text/", "application/javascript", "application/json")):
+            content_type += "; charset=utf-8"
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header(
+            "Cache-Control",
+            "no-cache" if file_path.name == "index.html" else "public, max-age=31536000, immutable",
+        )
         self.end_headers()
         self.wfile.write(content)
 
