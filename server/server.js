@@ -36,7 +36,7 @@ app.get('/api/test', async (req, res) => {
 app.use(express.static(path.join(__dirname, '../dist')));
 
 // Для будь-яких інших запитів повертаємо index.html (для коректної роботи роутингу React)
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
