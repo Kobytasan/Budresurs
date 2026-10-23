@@ -94,19 +94,17 @@ app.get('/api/test', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products');
-    if (!result.rows || result.rows.length === 0) {
-      return res.json(INITIAL_PRODUCTS);
-    }
-    res.json(result.rows);
+    const products = result.rows.length > 0 ? result.rows : INITIAL_PRODUCTS;
+    res.json({ products });
   } catch (err) {
     console.error('Помилка завантаження товарів з БД:', err);
-    res.json(INITIAL_PRODUCTS); // Резервний варіант, щоб фронтенд не падаляв
+    res.status(500).json({ error: 'Не вдалося завантажити товари.' });
   }
 });
 
 // 3. Міста доставки
 app.get('/api/cities', async (req, res) => {
-  res.json(['Київ', 'Львів', 'Харків', 'Одеса', 'Дніпро']);
+  res.json({ cities: ['Київ', 'Львів', 'Харків', 'Одеса', 'Дніпро'] });
 });
 
 // 4. Поточний користувач / кабінет
