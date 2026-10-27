@@ -126,7 +126,7 @@ export function AccountPage() {
           </div>
           <form className="form-stack" onSubmit={(event) => void submit(event)}>
             {registering && <label>Ваше ім’я<input name="name" autoComplete="name" minLength={2} maxLength={100} required /></label>}
-            <label>Електронна пошта<input name="email" type="email" autoComplete="email" maxLength={254} required /></label>
+            <label>Електронна пошта<input name="email" type="email" autoComplete="email" maxLength={254} pattern="^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$" title="Введіть адресу у форматі name@example.com" required /></label>
             {registering && <><label>Номер телефону<input name="phone" type="tel" autoComplete="tel" minLength={9} maxLength={20} placeholder="+380 00 000 00 00" required /></label><label>Ваше місто<select name="city" value={cities.includes(city) ? city : (cities[0] || 'Київ')} onChange={(event) => setCity(event.target.value)} required>{(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}</select></label></>}
             <label>Пароль<input name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 12 : undefined} maxLength={registering ? 128 : 256} required />{registering && <small>Щонайменше 12 символів.</small>}</label>
             {error && <p className="form-message" role="alert">{error}</p>}

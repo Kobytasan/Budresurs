@@ -13,6 +13,7 @@ import {
   Package,
   Plus,
   Store,
+  Trash2,
   Users,
   X,
 } from 'lucide-react'
@@ -331,6 +332,22 @@ export function StaffPage() {
     }
   }
 
+  async function deleteStaff(record: StaffRecord) {
+    if (!window.confirm(`Видалити працівника «${record.name}»? Його доступ буде закрито, а записи історії статусів збережуться.`)) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      await api(`/api/admin/users/${record.id}`, { method: 'DELETE' })
+      setStaff((current) => current.filter((item) => item.id !== record.id))
+      setNotice(`Працівника «${record.name}» видалено.`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не вдалося видалити працівника.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function createSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -399,7 +416,7 @@ export function StaffPage() {
           {activeTab === 'overview' && <OverviewPanel role={user.role} overview={overview} products={products} lowStock={lowStockProducts.length} onNavigate={setActiveTab} />}
           {activeTab === 'finance' && <FinancePanel role={user.role} overview={overview} orders={orders} busy={busy} onChange={changeOrder} />}
           {activeTab === 'inventory' && <InventoryPanel products={products} suppliers={suppliers.filter((supplier) => supplier.active)} busy={busy} onSave={saveProduct} />}
-          {activeTab === 'team' && user.role === 'director' && <TeamPanel staff={staff} currentUserId={user.id} busy={busy} onCreate={createStaff} onUpdate={updateStaff} />}
+          {activeTab === 'team' && user.role === 'director' && <TeamPanel staff={staff} currentUserId={user.id} busy={busy} onCreate={createStaff} onUpdate={updateStaff} onDelete={deleteStaff} />}
           {activeTab === 'history' && user.role === 'director' && <HistoryPanel history={history} />}
           {activeTab === 'suppliers' && user.role === 'director' && <SuppliersPanel suppliers={suppliers} busy={busy} onCreate={createSupplier} />}
           {activeTab === 'support' && user.role === 'director' && <SupportPanel messages={messages} busy={busy} onUpdate={updateSupport} />}
@@ -529,43 +546,53 @@ function InventoryPanel({
 }
 
 function TeamPanel({
-  staff, currentUserId, busy, onCreate, onUpdate,
+  staff, currentUserId, busy, onCreate, onUpdate, onDelete,
 }: {
   staff: StaffRecord[]
   currentUserId: number
   busy: boolean
   onCreate: (event: FormEvent<HTMLFormElement>) => Promise<void>
   onUpdate: (record: StaffRecord, role: StaffRole, active: boolean) => Promise<void>
+  onDelete: (record: StaffRecord) => Promise<void>
 }) {
   return (
     <>
       <SectionHeader eyebrow="КОМАНДА" title="Працівники та доступи" description="Кожен працівник має власний профіль із доступом відповідно до посади." />
       <div className="admin-two-column">
-        <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Працівники</h2><p>Ролі, присутність і стан доступу</p></div></div><div className="table-scroll"><table><thead><tr><th>Ім’я / логін</th><th>Посада</th><th>Статус</th><th>Доступ</th><th /></tr></thead><tbody>{staff.map((record) => <StaffRow key={record.id} record={record} currentUserId={currentUserId} busy={busy} onUpdate={onUpdate} />)}</tbody></table></div></div>
-        <form className="panel-card form-stack" onSubmit={(event) => void onCreate(event)}><div className="panel-heading"><div><h2>Додати працівника</h2><p>Створіть обліковий запис і виберіть роль.</p></div><Plus size={18} /></div><label>Ім’я<input name="name" minLength={2} maxLength={100} required /></label><label>Логін<input name="username" pattern="[A-Za-z0-9_.-]{3,32}" required /></label><label>Посада<select name="role"><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option><option value="director">Директор</option></select></label><label>Тимчасовий пароль<input name="password" type="password" minLength={12} maxLength={128} required /><small>Щонайменше 12 символів.</small></label><button className="button button-dark button-full" type="submit" disabled={busy}>Додати працівника <Plus size={16} /></button></form>
+        <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Працівники</h2><p>Спочатку ім’я та прізвище, далі посада, присутність і доступ.</p></div></div><div className="table-scroll"><table><thead><tr><th>Ім’я та прізвище / логін</th><th>Посада</th><th>Статус</th><th>Доступ</th><th /></tr></thead><tbody>{staff.map((record) => <StaffRow key={record.id} record={record} currentUserId={currentUserId} busy={busy} onUpdate={onUpdate} onDelete={onDelete} />)}</tbody></table></div></div>
+        <form className="panel-card form-stack" onSubmit={(event) => void onCreate(event)}><div className="panel-heading"><div><h2>Додати працівника</h2><p>Створіть обліковий запис і виберіть роль.</p></div><Plus size={18} /></div><label>Ім’я та прізвище<input name="name" minLength={3} maxLength={100} pattern=".*\s+.*" title="Вкажіть ім’я та прізвище" placeholder="Наприклад, Олена Коваль" required /></label><label>Логін<input name="username" pattern="[A-Za-z0-9_.-]{3,32}" required /></label><label>Посада<select name="role"><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option><option value="director">Директор</option></select></label><label>Тимчасовий пароль<input name="password" type="password" minLength={12} maxLength={128} required /><small>Щонайменше 12 символів.</small></label><button className="button button-dark button-full" type="submit" disabled={busy}>Додати працівника <Plus size={16} /></button></form>
       </div>
     </>
   )
 }
 
 function StaffRow({
-  record, currentUserId, busy, onUpdate,
+  record, currentUserId, busy, onUpdate, onDelete,
 }: {
   record: StaffRecord
   currentUserId: number
   busy: boolean
   onUpdate: (record: StaffRecord, role: StaffRole, active: boolean) => Promise<void>
+  onDelete: (record: StaffRecord) => Promise<void>
 }) {
   const [role, setRole] = useState<StaffRole>(record.role)
   const [active, setActive] = useState(record.active)
-  return <tr><td><strong>{record.name}</strong><small className="cell-subtitle">{record.username}</small></td><td><select value={role} onChange={(event) => setRole(event.target.value as StaffRole)}><option value="director">Директор</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option></select></td><td><span className={`badge ${record.work_status === 'На роботі' ? 'badge-green' : 'badge-muted'}`}>{record.work_status}</span></td><td><label className="switch-label"><input type="checkbox" checked={active} disabled={record.id === currentUserId} onChange={(event) => setActive(event.target.checked)} />{active ? 'Активний' : 'Вимкнений'}</label></td><td><button className="button button-outline compact-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onUpdate(record, role, active)}>Зберегти</button></td></tr>
+  return <tr><td><strong>{record.name}</strong><small className="cell-subtitle">{record.username}</small></td><td><select value={role} disabled={record.role === 'director'} onChange={(event) => setRole(event.target.value as StaffRole)}><option value="director">Директор</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option></select></td><td><span className="badge status-badge-white">{record.work_status}</span></td><td><label className="switch-label"><input type="checkbox" checked={active} disabled={record.id === currentUserId} onChange={(event) => setActive(event.target.checked)} />{active ? 'Активний' : 'Вимкнений'}</label></td><td><div className="team-row-actions"><button className="button button-outline compact-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onUpdate(record, role, active)}>Зберегти</button>{record.role !== 'director' && <button className="button button-outline team-delete-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onDelete(record)}><Trash2 size={14} /> Видалити</button>}</div></td></tr>
 }
 
 function HistoryPanel({ history }: { history: StatusHistoryEntry[] }) {
+  const today = history.filter((entry) => new Date(entry.changed_at).toDateString() === new Date().toDateString())
+  const completedShifts = today.filter((entry) => entry.status === 'Кінець робочого дня' && entry.work_seconds !== null)
+  const workedSeconds = completedShifts.reduce((sum, entry) => sum + (entry.work_seconds || 0), 0)
   return (
     <>
       <SectionHeader eyebrow="ПРИСУТНІСТЬ КОМАНДИ" title="Історія робочих статусів" description="Зміни статусів і час від початку зміни до її завершення." />
-      <div className="panel-card table-panel"><div className="table-scroll"><table><thead><tr><th>Працівник</th><th>Статус</th><th>Дата і час</th><th>Тривалість</th></tr></thead><tbody>{history.map((entry) => <tr key={entry.id}><td><strong>{entry.name}</strong><small className="cell-subtitle">{entry.username}</small></td><td><span className={`badge ${entry.status === 'На роботі' ? 'badge-green' : 'badge-muted'}`}>{entry.status}</span></td><td>{formatDate(entry.changed_at)}</td><td>{shortDuration(entry.work_seconds)}</td></tr>)}</tbody></table>{history.length === 0 && <p className="empty-inline">Історія поки порожня.</p>}</div></div>
+      <div className="stat-grid history-summary">
+        <Stat label="Змінено статусів сьогодні" value={String(today.length)} icon={<CalendarClock />} />
+        <Stat label="Завершено змін сьогодні" value={String(completedShifts.length)} icon={<Check />} />
+        <Stat label="Час завершених змін" value={shortDuration(workedSeconds)} icon={<BriefcaseBusiness />} />
+      </div>
+      <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Останні зміни</h2><p>Записи від найновішого до найстарішого. Збережена історія лишається після видалення працівника.</p></div></div><div className="table-scroll"><table><thead><tr><th>Працівник</th><th>Статус</th><th>Дата і час</th><th>Тривалість</th></tr></thead><tbody>{history.map((entry) => <tr key={entry.id}><td><strong>{entry.name}</strong><small className="cell-subtitle">{entry.username}</small></td><td><span className="badge status-badge-white">{entry.status}</span></td><td>{formatDate(entry.changed_at)}</td><td>{shortDuration(entry.work_seconds)}</td></tr>)}</tbody></table>{history.length === 0 && <p className="empty-inline">Історія поки порожня.</p>}</div></div>
     </>
   )
 }

@@ -66,7 +66,7 @@ export function HomePage() {
 }
 
 export function CatalogPage() {
-  const { products, productsLoading, productsError, refreshProducts, favorites } = useStore()
+  const { products, productsLoading, productsError, refreshProducts, favorites, customer } = useStore()
   const categories = useProductCategories(products)
   const location = useLocation()
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -125,9 +125,9 @@ export function CatalogPage() {
       {!productsLoading && !productsError && visibleProducts.length === 0 && (
         <div className="empty-state">
           <span>{showingFavorites ? '♡' : '⌕'}</span>
-          <h2>{showingFavorites ? 'Улюблене поки порожнє' : 'Товарів не знайдено'}</h2>
-          <p>{showingFavorites ? 'Натисніть сердечко на картці товару, щоб зберегти його тут.' : 'Спробуйте змінити пошук або вибрати іншу категорію.'}</p>
-          {showingFavorites && <Link to="/products" className="button button-outline">До каталогу</Link>}
+          <h2>{showingFavorites ? customer ? 'Улюблене поки порожнє' : 'Увійдіть, щоб переглянути улюблене' : 'Товарів не знайдено'}</h2>
+          <p>{showingFavorites ? customer ? 'Натисніть сердечко на картці товару, щоб зберегти його тут.' : 'Улюблені товари зберігаються окремо для кожного кабінету.' : 'Спробуйте змінити пошук або вибрати іншу категорію.'}</p>
+          {showingFavorites && <Link to={customer ? '/products' : '/account'} className="button button-outline">{customer ? 'До каталогу' : 'Увійти або зареєструватися'}</Link>}
         </div>
       )}
     </section>

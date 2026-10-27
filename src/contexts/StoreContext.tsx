@@ -12,7 +12,6 @@ import { api } from '../api'
 import type { Customer, Product } from '../types'
 
 const CART_KEY = 'prometey-cart'
-const FAVORITES_KEY = 'prometey-favorites'
 const CITY_KEY = 'prometey-city'
 
 interface StoreValue {
@@ -29,6 +28,7 @@ interface StoreValue {
   setCustomer: (customer: Customer | null) => void
   setCity: (city: string) => void
   adjustCart: (sku: string, change: number) => void
+  setCartQuantity: (sku: string, quantity: number) => void
   removeFromCart: (sku: string) => void
   toggleFavorite: (sku: string) => Promise<void>
   refreshProducts: () => Promise<void>
@@ -55,17 +55,6 @@ function readCart(): Record<string, number> {
   }
 }
 
-function readFavorites(): string[] {
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')
-    return Array.isArray(saved)
-      ? [...new Set(saved.filter((item): item is string => typeof item === 'string'))]
-      : []
-  } catch {
-    return []
-  }
-}
-
 function responseArray<T>(payload: unknown, key: string): T[] {
   const value = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
     ? (payload as Record<string, unknown>)[key]
@@ -81,7 +70,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [productsLoading, setProductsLoading] = useState(true)
   const [productsError, setProductsError] = useState('')
   const [cart, setCart] = useState(readCart)
-  const [favorites, setFavorites] = useState(readFavorites)
+  const [favorites, setFavorites] = useState<string[]>([])
   const [favoritesLoading, setFavoritesLoading] = useState(false)
   const [cities, setCities] = useState<string[]>([])
   const [city, setCityState] = useState(
@@ -156,9 +145,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setFavoritesLoading(customerId !== null)
 
     if (customerId === null) {
-      const guestFavorites = readFavorites()
-      favoritesRef.current = guestFavorites
-      setFavorites(guestFavorites)
+      favoritesRef.current = []
+      setFavorites([])
+      localStorage.removeItem('prometey-favorites')
       return () => { active = false }
     }
 
@@ -208,8 +197,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!product) return
     setCart((current) => {
       const next = (current[sku] || 0) + change
-      if (next > product.stock) {
-        showToast('На складі немає більшої кількості цього товару.')
+      if (next > Math.min(product.stock, 99)) {
+        showToast(`Доступна кількість цього товару: ${Math.min(product.stock, 99)}.`)
         return current
       }
       const updated = { ...current }
@@ -217,6 +206,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       else updated[sku] = Math.min(next, 99)
       return updated
     })
+  }, [products, showToast])
+
+  const setCartQuantity = useCallback((sku: string, quantity: number) => {
+    const product = products.find((item) => item.sku === sku)
+    if (!product) return
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      showToast('Вкажіть цілу кількість від 1.')
+      return
+    }
+    if (quantity > Math.min(product.stock, 99)) {
+      showToast(product.stock > 0
+        ? `Можна замовити до ${Math.min(product.stock, 99)} ${product.unit} товару «${product.name}» за раз.`
+        : `Товар «${product.name}» зараз відсутній на складі.`)
+      return
+    }
+    setCart((current) => ({ ...current, [sku]: quantity }))
   }, [products, showToast])
 
   const removeFromCart = useCallback((sku: string) => {
@@ -229,6 +234,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const toggleFavorite = useCallback(async (sku: string) => {
     const customerId = customer?.id ?? null
+    if (customerId === null) {
+      showToast('Щоб зберігати улюблені товари, увійдіть або створіть кабінет.')
+      return
+    }
     if (favoritesLoading || customerIdRef.current !== customerId) {
       showToast('Зачекайте, поки завантажиться ваше обране.')
       return
@@ -239,12 +248,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       : [...favoritesRef.current, sku]
     favoritesRef.current = updated
     setFavorites(updated)
-
-    if (customerId === null) {
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated))
-      showToast(wasFavorite ? 'Видалено з улюбленого' : 'Додано до улюбленого')
-      return
-    }
 
     try {
       await api(`/api/customer/favorites${wasFavorite ? `/${encodeURIComponent(sku)}` : ''}`, {
@@ -279,6 +282,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCustomer,
     setCity,
     adjustCart,
+    setCartQuantity,
     removeFromCart,
     toggleFavorite,
     refreshProducts,
@@ -286,7 +290,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), [
     products, productsLoading, productsError, cart, favorites, favoritesLoading,
     visibleFavorites, visibleFavoritesLoading, cities, city,
-    customer, toast, setCity, adjustCart, removeFromCart, toggleFavorite,
+    customer, toast, setCity, adjustCart, setCartQuantity, removeFromCart, toggleFavorite,
     refreshProducts, showToast,
   ])
 

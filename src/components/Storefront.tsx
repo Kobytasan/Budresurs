@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   Heart,
@@ -28,6 +28,62 @@ export function formatDate(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function CartQuantityInput({
+  product, quantity, onChange, descriptionId,
+}: {
+  product: Product
+  quantity: number
+  onChange: (quantity: number) => void
+  descriptionId?: string
+}) {
+  const { showToast } = useStore()
+  const [draft, setDraft] = useState(String(quantity))
+
+  useEffect(() => setDraft(String(quantity)), [quantity])
+
+  function commitQuantity() {
+    if (!/^\d+$/.test(draft)) {
+      showToast('Вкажіть цілу кількість від 1.')
+      setDraft(String(quantity))
+      return
+    }
+    const requested = Number(draft)
+    if (requested > Math.min(product.stock, 99)) {
+      showToast(product.stock > 0
+        ? `Можна замовити до ${Math.min(product.stock, 99)} ${product.unit} товару «${product.name}» за раз.`
+        : `Товар «${product.name}» зараз відсутній на складі.`)
+      setDraft(String(quantity))
+      return
+    }
+    if (requested < 1) {
+      showToast('Вкажіть цілу кількість від 1.')
+      setDraft(String(quantity))
+      return
+    }
+    onChange(requested)
+  }
+
+  return (
+    <input
+      className="quantity-input"
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      aria-label={`Кількість товару «${product.name}»`}
+      aria-describedby={descriptionId}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commitQuantity}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
+      }}
+    />
+  )
 }
 
 function CityPicker() {
@@ -76,7 +132,7 @@ export function PublicLayout() {
         </nav>
         <div className="store-actions">
           <CityPicker />
-          <Link className="icon-link favorite-link" to="/products#favorites" aria-label={`Улюблене${customer ? ' у вашому кабінеті' : ''}, ${favorites.length}`}>
+          <Link className="icon-link favorite-link" to={customer ? '/products#favorites' : '/account'} aria-label={customer ? `Улюблене у вашому кабінеті, ${favorites.length}` : 'Увійти, щоб переглянути улюблене'}>
             <Heart size={19} />
             <span>Обране</span>
             {favorites.length > 0 && <b>{favorites.length}</b>}
@@ -104,7 +160,7 @@ export function PublicLayout() {
 
 function CartDrawer({ onClose }: { onClose: () => void }) {
   const {
-    products, cart, cities, city, customer, adjustCart, removeFromCart, showToast,
+    products, cart, cities, city, customer, adjustCart, setCartQuantity, removeFromCart, showToast,
     refreshProducts,
   } = useStore()
   const [checkoutOpen, setCheckoutOpen] = useState(false)
@@ -118,10 +174,15 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
     }))
     .filter((entry): entry is { product: Product; quantity: number } => Boolean(entry.product))
   const total = entries.reduce((sum, entry) => sum + entry.product.price * entry.quantity, 0)
+  const hasUnavailableQuantity = entries.some(({ product, quantity }) => quantity > product.stock)
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    if (hasUnavailableQuantity) {
+      setError('Зменште кількість товарів до наявного складського залишку.')
+      return
+    }
     setSubmitting(true)
     const form = new FormData(event.currentTarget)
     try {
@@ -168,11 +229,14 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
                   <ProductArt product={product} compact />
                   <div className="cart-line-copy">
                     <strong>{product.name}</strong><small>{formatMoney(product.price)} / {product.unit}</small>
+                    <small id={`cart-stock-${product.sku}`} className={quantity > product.stock ? 'stock-shortage' : 'stock-available'}>
+                      {quantity > product.stock ? `Доступно лише ${product.stock} ${product.unit}` : `На складі: ${product.stock} ${product.unit}`}
+                    </small>
                     <div className="quantity-control">
                       <button type="button" onClick={() => adjustCart(product.sku, -1)} aria-label="Зменшити">−</button>
-                      <span>{quantity}</span>
-                      <button type="button" onClick={() => adjustCart(product.sku, 1)} aria-label="Збільшити" disabled={quantity >= product.stock}>+</button>
-                      <button className="text-button" type="button" onClick={() => removeFromCart(product.sku)}>Видалити</button>
+                      <CartQuantityInput product={product} quantity={quantity} descriptionId={`cart-stock-${product.sku}`} onChange={(next) => setCartQuantity(product.sku, next)} />
+                      <button type="button" onClick={() => adjustCart(product.sku, 1)} aria-label={quantity >= Math.min(product.stock, 99) ? `Досягнуто ліміту: ${Math.min(product.stock, 99)} ${product.unit}` : 'Збільшити'} disabled={quantity >= Math.min(product.stock, 99)}>+</button>
+                      <button className="text-button remove-cart-button" type="button" onClick={() => removeFromCart(product.sku)}>Видалити</button>
                     </div>
                   </div>
                   <strong>{formatMoney(product.price * quantity)}</strong>
@@ -181,8 +245,9 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
             </div>
             <div className="cart-total"><span>Разом</span><strong>{formatMoney(total)}</strong></div>
             <p className="delivery-hint">{total >= 50000 ? 'Безкоштовна доставка для замовлення!' : `Ще ${formatMoney(50000 - total)} до безкоштовної доставки.`}</p>
+            {hasUnavailableQuantity && <p className="stock-shortage" role="alert">Змініть кількість товарів відповідно до актуальної наявності, щоб оформити замовлення.</p>}
             {!checkoutOpen ? (
-              <button className="button button-dark button-full" type="button" onClick={() => { setCheckoutOpen(true); setSuccess('') }}>
+              <button className="button button-dark button-full" type="button" disabled={hasUnavailableQuantity} onClick={() => { setCheckoutOpen(true); setSuccess('') }}>
                 Оформити замовлення <ArrowRight size={16} />
               </button>
             ) : (
@@ -193,7 +258,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
                 <label>Місто<select name="city" defaultValue={customer?.city || city} required>{(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}</select></label>
                 <label>Адреса доставки<textarea name="address" minLength={5} maxLength={200} required /></label>
                 {error && <p className="form-message" role="alert">{error}</p>}
-                <button className="button button-dark button-full" type="submit" disabled={submitting}>
+                <button className="button button-dark button-full" type="submit" disabled={submitting || hasUnavailableQuantity}>
                   {submitting ? 'Надсилаємо…' : `Підтвердити · ${formatMoney(total)}`}
                 </button>
               </form>
@@ -233,14 +298,17 @@ export function ProductArt({ product, compact = false }: { product: Product; com
 }
 
 export function ProductCard({ product }: { product: Product }) {
-  const { cart, favorites, favoritesLoading, adjustCart, toggleFavorite, showToast } = useStore()
+  const { cart, favorites, favoritesLoading, customer, adjustCart, setCartQuantity, toggleFavorite, showToast } = useStore()
+  const navigate = useNavigate()
   const quantity = cart[product.sku] || 0
   const isFavorite = favorites.includes(product.sku)
   const unavailable = product.stock < 1
 
   function add() {
-    if (unavailable || quantity >= product.stock) {
-      showToast('Більше цього товару зараз немає на складі.')
+    if (unavailable || quantity >= Math.min(product.stock, 99)) {
+      showToast(unavailable
+        ? 'Цього товару зараз немає на складі.'
+        : `До кошика можна додати не більше ${Math.min(product.stock, 99)} ${product.unit}.`)
       return
     }
     adjustCart(product.sku, 1)
@@ -258,7 +326,14 @@ export function ProductCard({ product }: { product: Product }) {
           aria-label={isFavorite ? 'Видалити з улюбленого' : 'Додати до улюбленого'}
           aria-pressed={isFavorite}
           disabled={favoritesLoading}
-          onClick={() => void toggleFavorite(product.sku)}
+          onClick={() => {
+            if (!customer) {
+              showToast('Увійдіть або створіть кабінет, щоб зберігати улюблене.')
+              navigate('/account')
+              return
+            }
+            void toggleFavorite(product.sku)
+          }}
         ><Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} /></button>
       </div>
       <div className="product-info">
@@ -270,8 +345,8 @@ export function ProductCard({ product }: { product: Product }) {
           {quantity ? (
             <div className="quantity-control" aria-label={`У кошику ${quantity}`}>
               <button type="button" onClick={() => adjustCart(product.sku, -1)} aria-label="Прибрати один товар">−</button>
-              <span>{quantity}</span>
-              <button type="button" onClick={() => adjustCart(product.sku, 1)} disabled={unavailable || quantity >= product.stock} aria-label="Додати один товар">+</button>
+              <CartQuantityInput product={product} quantity={quantity} onChange={(next) => setCartQuantity(product.sku, next)} />
+              <button type="button" onClick={() => adjustCart(product.sku, 1)} disabled={unavailable || quantity >= Math.min(product.stock, 99)} aria-label={unavailable ? 'Немає в наявності' : quantity >= Math.min(product.stock, 99) ? `Досягнуто ліміту: ${Math.min(product.stock, 99)} ${product.unit}` : 'Додати один товар'}>+</button>
             </div>
           ) : (
             <button className="add-button" type="button" disabled={unavailable} onClick={add} aria-label={unavailable ? 'Немає в наявності' : 'Додати до кошика'}>
@@ -279,6 +354,15 @@ export function ProductCard({ product }: { product: Product }) {
             </button>
           )}
         </div>
+        {quantity > 0 && (
+          <small className={quantity > product.stock ? 'quantity-limit-note stock-shortage' : 'quantity-limit-note'}>
+            {quantity > product.stock
+              ? `На складі лише ${product.stock} ${product.unit}, у кошику ${quantity}`
+              : quantity >= Math.min(product.stock, 99)
+                ? `У кошику весь доступний залишок: ${product.stock} ${product.unit}`
+                : `На складі залишилось ${product.stock - quantity} ${product.unit}`}
+          </small>
+        )}
       </div>
     </article>
   )

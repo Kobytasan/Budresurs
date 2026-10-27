@@ -146,7 +146,17 @@ function text(value, maximum = 200) {
 }
 
 function validEmail(value) {
-  return value.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
+  if (typeof value !== 'string' || value.length > 254) return false
+  const [local, domain, ...extra] = value.split('@')
+  if (extra.length || !local || local.length > 64 || !domain
+    || !/^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/.test(local)) {
+    return false
+  }
+  const labels = domain.split('.')
+  return labels.length >= 2
+    && labels.every((label) => label.length > 0 && label.length <= 63
+      && /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label))
+    && /^[A-Za-z]{2,63}$/.test(labels[labels.length - 1])
 }
 
 function userPayload(row) {
@@ -201,6 +211,15 @@ async function initDB() {
       status VARCHAR(40) NOT NULL, changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       work_seconds INTEGER
     );
+    ALTER TABLE work_status_history ADD COLUMN IF NOT EXISTS employee_name VARCHAR(100);
+    ALTER TABLE work_status_history ADD COLUMN IF NOT EXISTS employee_username VARCHAR(32);
+    UPDATE work_status_history h SET employee_name = u.name, employee_username = u.username
+      FROM users u WHERE h.user_id = u.id
+      AND (h.employee_name IS NULL OR h.employee_username IS NULL);
+    ALTER TABLE work_status_history DROP CONSTRAINT IF EXISTS work_status_history_user_id_fkey;
+    ALTER TABLE work_status_history ALTER COLUMN user_id DROP NOT NULL;
+    ALTER TABLE work_status_history ADD CONSTRAINT work_status_history_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
     CREATE TABLE IF NOT EXISTS customers (
       id BIGSERIAL PRIMARY KEY, email VARCHAR(254) UNIQUE,
       name VARCHAR(100) NOT NULL, phone VARCHAR(20) NOT NULL UNIQUE,
@@ -327,8 +346,8 @@ async function initDB() {
     )
   }
   await pool.query(
-    `INSERT INTO work_status_history (user_id, status, changed_at)
-     SELECT u.id, u.work_status, NOW() FROM users u
+    `INSERT INTO work_status_history (user_id, employee_name, employee_username, status, changed_at)
+     SELECT u.id, u.name, u.username, u.work_status, NOW() FROM users u
      WHERE NOT EXISTS (
        SELECT 1 FROM work_status_history h WHERE h.user_id = u.id
      )`,
@@ -340,6 +359,40 @@ app.get('/api/test', async (req, res, next) => {
     const { rows } = await pool.query('SELECT NOW() AS now')
     res.json({ success: true, time: rows[0] })
   } catch (error) { next(error) }
+})
+
+app.delete('/api/admin/users/:id', async (req, res, next) => {
+  let client
+  try {
+    const current = await requireUser(req, res, ['director'])
+    if (!current) return
+    const id = Number(req.params.id)
+    if (!Number.isSafeInteger(id) || id < 1) return apiError(res, 400, 'Некоректний номер працівника.')
+    client = await pool.connect()
+    await client.query('BEGIN')
+    const result = await client.query('SELECT id, role FROM users WHERE id = $1 FOR UPDATE', [id])
+    const target = result.rows[0]
+    if (!target) {
+      await client.query('ROLLBACK')
+      return apiError(res, 404, 'Працівника не знайдено.')
+    }
+    if (target.role === 'director') {
+      await client.query('ROLLBACK')
+      return apiError(res, 403, 'Обліковий запис директора видалити не можна.')
+    }
+    if (target.id === current.id) {
+      await client.query('ROLLBACK')
+      return apiError(res, 400, 'Не можна видалити власний обліковий запис.')
+    }
+    await client.query('DELETE FROM users WHERE id = $1', [id])
+    await client.query('COMMIT')
+    res.json({ ok: true })
+  } catch (error) {
+    if (client) await client.query('ROLLBACK')
+    next(error)
+  } finally {
+    client?.release()
+  }
 })
 
 app.get('/api/products', async (req, res, next) => {
@@ -811,11 +864,12 @@ app.post('/api/admin/users', async (req, res, next) => {
     const name = text(req.body?.name, 100)
     const password = req.body?.password
     const role = req.body?.role
-    if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username) || name.length < 2
-      || typeof password !== 'string' || password.length < 12 || password.length > 128
-      || !Object.hasOwn(ROLE_LABELS, role)) {
-      return apiError(res, 400, 'Перевірте дані. Пароль має містити щонайменше 12 символів.')
+    if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username)) return apiError(res, 400, 'Логін має містити 3–32 латинські літери, цифри або . _ -.')
+    if (name.split(/\s+/).length < 2) return apiError(res, 400, 'Вкажіть ім’я та прізвище працівника.')
+    if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
+      return apiError(res, 400, 'Пароль має містити щонайменше 12 символів.')
     }
+    if (!Object.hasOwn(ROLE_LABELS, role)) return apiError(res, 400, 'Оберіть коректну посаду.')
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
@@ -824,8 +878,9 @@ app.post('/api/admin/users', async (req, res, next) => {
         [username, name, role, hashPassword(password)],
       )
       await client.query(
-        `INSERT INTO work_status_history (user_id, status) VALUES ($1, 'На роботі')`,
-        [created.rows[0].id],
+        `INSERT INTO work_status_history (user_id, employee_name, employee_username, status)
+         VALUES ($1,$2,$3,'На роботі')`,
+        [created.rows[0].id, name, username],
       )
       await client.query('COMMIT')
       res.status(201).json({ id: created.rows[0].id, message: 'Працівника додано.' })
@@ -843,7 +898,7 @@ app.patch('/api/admin/users/:id', async (req, res, next) => {
     if (!current) return
     const id = Number(req.params.id)
     const { role, active } = req.body || {}
-    if (!Number.isInteger(id) || !Object.hasOwn(ROLE_LABELS, role) || typeof active !== 'boolean') {
+    if (!Number.isSafeInteger(id) || id < 1 || !Object.hasOwn(ROLE_LABELS, role) || typeof active !== 'boolean') {
       return apiError(res, 400, 'Перевірте роль і стан доступу.')
     }
     const client = await pool.connect()
@@ -852,6 +907,10 @@ app.patch('/api/admin/users/:id', async (req, res, next) => {
       const targetResult = await client.query('SELECT id, role, active FROM users WHERE id = $1 FOR UPDATE', [id])
       const target = targetResult.rows[0]
       if (!target) { await client.query('ROLLBACK'); return apiError(res, 404, 'Працівника не знайдено.') }
+      if (target.role === 'director' && role !== 'director') {
+        await client.query('ROLLBACK')
+        return apiError(res, 403, 'Посаду директора змінити не можна.')
+      }
       if (target.id === current.id && !active) { await client.query('ROLLBACK'); return apiError(res, 400, 'Не можна вимкнути власний доступ.') }
       if (target.active && target.role === 'director' && (role !== 'director' || !active)) {
         const count = await client.query("SELECT COUNT(*)::int AS count FROM users WHERE role = 'director' AND active")
@@ -869,8 +928,10 @@ app.get('/api/admin/status-history', async (req, res, next) => {
   try {
     if (!await requireUser(req, res, ['director'])) return
     const { rows } = await pool.query(
-      `SELECT h.id, u.name, u.username, h.status, h.changed_at, h.work_seconds
-       FROM work_status_history h JOIN users u ON u.id = h.user_id
+      `SELECT h.id, COALESCE(h.employee_name, u.name) AS name,
+       COALESCE(h.employee_username, u.username) AS username,
+       h.status, h.changed_at, h.work_seconds
+       FROM work_status_history h LEFT JOIN users u ON u.id = h.user_id
        ORDER BY h.id DESC LIMIT 500`,
     )
     res.json({ history: rows })
@@ -902,8 +963,10 @@ app.patch('/api/auth/status', async (req, res, next) => {
       }
       await client.query('UPDATE users SET work_status = $1 WHERE id = $2', [status, user.id])
       await client.query(
-        'INSERT INTO work_status_history (user_id, status, work_seconds) VALUES ($1,$2,$3)',
-        [user.id, status, workSeconds],
+        `INSERT INTO work_status_history
+         (user_id, employee_name, employee_username, status, work_seconds)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [user.id, user.name, user.username, status, workSeconds],
       )
       await client.query('COMMIT')
       res.json({ ok: true, work_status: status })
