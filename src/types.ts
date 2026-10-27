@@ -1,4 +1,4 @@
-export type StaffRole = 'director' | 'accountant' | 'inventory'
+export type StaffRole = 'director' | 'accountant' | 'inventory' | 'manager'
 
 export interface Product {
   sku: string

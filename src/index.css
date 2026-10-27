@@ -826,6 +826,38 @@ h1, h2, h3, p { margin-top: 0; }
   --shadow: 0 14px 35px rgb(36 40 33 / 9%);
 }
 
+.account-page:not(.account-login-page) {
+  display: block;
+  min-height: 65vh;
+  padding-top: 40px;
+  padding-bottom: 70px;
+}
+.account-dashboard { width: 100%; }
+.inventory-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.inventory-summary .stat-card { min-width: 0; }
+.inventory-summary .stat-card strong { font-size: clamp(14px, 1.4vw, 21px); }
+.unit-price-field, .stock-edit-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.unit-price-field input, .stock-edit-field input { width: 86px; }
+.stock-edit-field > span, .unit-price-field > span { color: #70756a; font-size: 10px; }
+.product-edit-row { justify-content: flex-end; }
+@media (max-width: 900px) {
+  .inventory-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .account-page:not(.account-login-page) { padding-top: 22px; padding-bottom: 36px; }
+  .inventory-summary { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .inventory-summary .stat-card { padding: 10px; }
+  .unit-price-field input, .stock-edit-field input { width: 70px; }
+}
 body { background-color: var(--canvas); }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline-color: #b57e08;

@@ -29,7 +29,7 @@ PBKDF2_ITERATIONS = 310_000
 DEMO_MODE_ENABLED = os.environ.get(
     "BUDRESURS_DEMO_MODE", os.environ.get("PROMETEY_DEMO_MODE", "1")
 ) == "1"
-ROLES = {"director", "accountant", "inventory"}
+ROLES = {"director", "accountant", "inventory", "manager"}
 WORK_STATUSES = {
     "На роботі", "Вихідний", "У відпустці", "Кінець робочого дня",
 }
@@ -40,6 +40,7 @@ ROLE_LABELS = {
     "director": "Директор",
     "accountant": "Бухгалтер",
     "inventory": "Працівник складу",
+    "manager": "Менеджер продажу",
 }
 
 
@@ -208,6 +209,39 @@ def init_db():
             db.execute(
                 "ALTER TABLE users ADD COLUMN work_status TEXT NOT NULL DEFAULT 'На роботі'"
             )
+        users_schema = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'"
+        ).fetchone()["sql"]
+        if "'manager'" not in users_schema:
+            db.execute("PRAGMA foreign_keys = OFF")
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(
+                    """CREATE TABLE users_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                        name TEXT NOT NULL,
+                        role TEXT NOT NULL CHECK(role IN ('director', 'accountant', 'inventory', 'manager')),
+                        password_hash TEXT NOT NULL,
+                        work_status TEXT NOT NULL DEFAULT 'На роботі',
+                        active INTEGER NOT NULL DEFAULT 1,
+                        created_at TEXT NOT NULL
+                    )"""
+                )
+                db.execute(
+                    """INSERT INTO users_new
+                       (id, username, name, role, password_hash, work_status, active, created_at)
+                       SELECT id, username, name, role, password_hash, work_status, active, created_at
+                       FROM users"""
+                )
+                db.execute("DROP TABLE users")
+                db.execute("ALTER TABLE users_new RENAME TO users")
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.execute("PRAGMA foreign_keys = ON")
         customer_columns = {
             row["name"] for row in db.execute("PRAGMA table_info(customers)").fetchall()
         }
@@ -270,6 +304,10 @@ def init_db():
                         product["stock"],
                     ),
                 )
+        db.execute(
+            "UPDATE products SET price = 549900 "
+            "WHERE sku = 'BR-PERFORATOR-800' AND price = 289900"
+        )
 
         director_password = os.environ.get(
             "BUDRESURS_ADMIN_PASSWORD",
@@ -984,7 +1022,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         return dict(totals)
 
     def admin_overview(self):
-        user = self.require_role({"director", "accountant"})
+        user = self.require_role({"director", "accountant", "manager"})
         if not user:
             return
         with get_db() as db:
@@ -1002,12 +1040,12 @@ class StoreHandler(BaseHTTPRequestHandler):
         return self.send_json(200, result)
 
     def admin_orders(self):
-        user = self.require_role({"director", "accountant"})
+        user = self.require_role({"director", "accountant", "manager"})
         if not user:
             return
         with get_db() as db:
             fields = "id, created_at, total, payment_status"
-            if user["role"] == "director":
+            if user["role"] in {"director", "manager"}:
                 fields += ", customer_name, phone, address, status, city"
             orders = db.execute(
                 f"SELECT {fields} FROM orders ORDER BY id DESC LIMIT 100"
@@ -1015,7 +1053,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         return self.send_json(200, {"orders": [dict(row) for row in orders]})
 
     def update_order(self, order_id):
-        user = self.require_role({"director", "accountant"})
+        user = self.require_role({"director", "accountant", "manager"})
         if not user:
             return
         try:
@@ -1028,13 +1066,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         updates = []
         values = []
         if "payment_status" in payload:
+            if user["role"] == "manager":
+                return self.send_json(403, {"error": "Змінювати оплату може бухгалтер або директор."})
             if payload["payment_status"] not in {"Оплачено", "Очікує оплати"}:
                 return self.send_json(400, {"error": "Некоректний статус оплати."})
             updates.append("payment_status = ?")
             values.append(payload["payment_status"])
         if "status" in payload:
-            if user["role"] != "director":
-                return self.send_json(403, {"error": "Керувати статусом замовлення може лише директор."})
+            if user["role"] not in {"director", "manager"}:
+                return self.send_json(403, {"error": "Керувати статусом замовлення може менеджер або директор."})
             if payload["status"] not in {"Нове", "Комплектується", "Доставляється", "Виконано"}:
                 return self.send_json(400, {"error": "Некоректний статус замовлення."})
             updates.append("status = ?")
@@ -1199,7 +1239,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         return self.send_json(201, {"id": cursor.lastrowid, "message": "Постачальника додано."})
 
     def admin_support(self):
-        if not self.require_role({"director"}):
+        if not self.require_role({"director", "manager"}):
             return
         with get_db() as db:
             messages = db.execute(
@@ -1209,7 +1249,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         return self.send_json(200, {"messages": [dict(row) for row in messages]})
 
     def update_support_message(self, message_id):
-        if not self.require_role({"director"}):
+        if not self.require_role({"director", "manager"}):
             return
         try:
             message_id = int(message_id)

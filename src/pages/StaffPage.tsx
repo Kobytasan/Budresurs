@@ -48,6 +48,7 @@ const roleNames: Record<StaffRole, string> = {
   director: 'Директор',
   accountant: 'Бухгалтер',
   inventory: 'Працівник складу',
+  manager: 'Менеджер продажу',
 }
 
 const tabsByRole: Record<StaffRole, Tab[]> = {
@@ -69,6 +70,12 @@ const tabsByRole: Record<StaffRole, Tab[]> = {
   inventory: [
     { id: 'overview', label: 'Огляд складу', icon: LayoutDashboard },
     { id: 'inventory', label: 'Товари та склад', icon: Boxes },
+    { id: 'profile', label: 'Мій профіль', icon: UserRound },
+  ],
+  manager: [
+    { id: 'overview', label: 'Огляд продажів', icon: LayoutDashboard },
+    { id: 'finance', label: 'Замовлення', icon: BriefcaseBusiness },
+    { id: 'support', label: 'Звернення покупців', icon: CircleHelp },
     { id: 'profile', label: 'Мій профіль', icon: UserRound },
   ],
 }
@@ -145,7 +152,7 @@ export function StaffPage() {
         const result = await api<{ suppliers: Supplier[] }>('/api/admin/suppliers')
         setSuppliers(result.suppliers)
       }
-      if (activeTab === 'support') {
+      if (activeTab === 'support' && (user.role === 'director' || user.role === 'manager')) {
         const result = await api<{ messages: SupportMessage[] }>('/api/admin/support')
         setMessages(result.messages)
       }
@@ -478,7 +485,7 @@ export function StaffPage() {
           {activeTab === 'team' && user.role === 'director' && <TeamPanel staff={staff} currentUserId={user.id} busy={busy} onCreate={createStaff} onUpdate={updateStaff} onDelete={deleteStaff} />}
           {activeTab === 'history' && user.role === 'director' && <HistoryPanel history={history} />}
           {activeTab === 'suppliers' && user.role === 'director' && <SuppliersPanel suppliers={suppliers} busy={busy} onCreate={createSupplier} />}
-          {activeTab === 'support' && user.role === 'director' && <SupportPanel messages={messages} busy={busy} onUpdate={updateSupport} />}
+          {activeTab === 'support' && (user.role === 'director' || user.role === 'manager') && <SupportPanel messages={messages} busy={busy} onUpdate={updateSupport} />}
           {activeTab === 'profile' && <StaffProfilePanel key={`${user.id}-${user.username}-${user.name}`} user={user} busy={busy} onSaveProfile={saveOwnProfile} onChangePassword={changeOwnPassword} />}
         </main>
       </div>
@@ -608,10 +615,10 @@ function FinancePanel({
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null)
   return (
     <>
-      <SectionHeader eyebrow="ФІНАНСИ" title="Фінансовий журнал" description="Підсумки замовлень і статуси оплат." />
+      <SectionHeader eyebrow={role === 'manager' ? 'ПРОДАЖІ ТА ОБСЛУГОВУВАННЯ' : 'ФІНАНСИ'} title={role === 'manager' ? 'Замовлення та продажі' : 'Фінансовий журнал'} description={role === 'manager' ? 'Переглядайте замовлення, контакти покупців і керуйте виконанням.' : 'Підсумки замовлень і статуси оплат.'} />
       <div className="stat-grid stat-grid-four"><Stat label="Замовлень" value={String(totals?.order_count ?? 0)} icon={<BriefcaseBusiness />} /><Stat label="Сума" value={formatMoney(totals?.revenue ?? 0)} icon={<BadgeDollarSign />} /><Stat label="Отримано" value={formatMoney(totals?.paid ?? 0)} icon={<Check />} tone="green" /><Stat label="До отримання" value={formatMoney(totals?.due ?? 0)} icon={<CalendarClock />} tone="warning" /></div>
       <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Останні замовлення</h2><p>{role === 'accountant' ? 'Бухгалтерський доступ: контакти покупців приховано' : 'Статуси, суми та інформація про доставку'}</p></div></div>
-        {orders.length === 0 ? <p className="empty-inline">Замовлень поки немає.</p> : <div className="table-scroll"><table><thead><tr><th>№ замовлення</th><th>Дата</th>{role === 'director' && <><th>Покупець</th><th>Місто</th></>}<th>Сума</th><th>Оплата</th>{role === 'director' && <th>Статус</th>}</tr></thead><tbody>
+        {orders.length === 0 ? <p className="empty-inline">Замовлень поки немає.</p> : <div className="table-scroll"><table><thead><tr><th>№ замовлення</th><th>Дата</th>{(role === 'director' || role === 'manager') && <><th>Покупець</th><th>Місто</th></>}<th>Сума</th><th>Оплата</th>{(role === 'director' || role === 'manager') && <th>Статус</th>}</tr></thead><tbody>
           {orders.map((order) => {
             const expanded = expandedOrderId === order.id
             return <Fragment key={order.id}>
@@ -620,19 +627,19 @@ function FinancePanel({
                   <strong>№{order.id}</strong>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button></td>
                 <td>{formatDate(order.created_at)}</td>
-                {role === 'director' && <><td>{order.customer_name}<small className="cell-subtitle">{order.phone}</small></td><td>{order.city}</td></>}
+                {(role === 'director' || role === 'manager') && <><td>{order.customer_name}<small className="cell-subtitle">{order.phone}</small></td><td>{order.city}</td></>}
                 <td><strong>{formatMoney(order.total)}</strong></td>
                 <td><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : order.payment_status === 'Оплачено' ? 'badge-green' : 'badge-muted'}`}>{order.status === 'Скасовано' && order.payment_status !== 'Оплачено' ? 'Не оплачено · скасовано' : order.payment_status}</span></td>
-                {role === 'director' && <td><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'status-badge-white'}`}>{order.status || 'Нове'}</span></td>}
+                {(role === 'director' || role === 'manager') && <td><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'status-badge-white'}`}>{order.status || 'Нове'}</span></td>}
               </tr>
-              {expanded && <tr className="order-details-row"><td colSpan={role === 'director' ? 7 : 4}>
+              {expanded && <tr className="order-details-row"><td colSpan={role === 'director' || role === 'manager' ? 7 : 4}>
                 <div className="order-detail-panel">
                   <div className="order-detail-heading"><div><strong>Замовлення №{order.id}</strong><small>{formatDate(order.created_at)}</small></div><strong>{formatMoney(order.total)}</strong></div>
-                  {role === 'director' && <div className="order-customer-details"><span><small>Покупець</small>{order.customer_name}</span><span><small>Телефон</small>{order.phone}</span><span><small>Місто</small>{order.city}</span><span><small>Адреса</small>{order.address}</span></div>}
+                  {(role === 'director' || role === 'manager') && <div className="order-customer-details"><span><small>Покупець</small>{order.customer_name}</span><span><small>Телефон</small>{order.phone}</span><span><small>Місто</small>{order.city}</span><span><small>Адреса</small>{order.address}</span></div>}
                   <div className="order-detail-items"><strong>Склад замовлення</strong>{order.items.map((item, index) => <div key={`${item.product_name}-${index}`}><span>{item.product_name} · {item.quantity} {item.unit} × {formatMoney(item.unit_price)}</span><strong>{formatMoney(item.line_total)}</strong></div>)}</div>
                   <div className="order-detail-controls">
-                    <label>Оплата<select aria-label={`Статус оплати замовлення ${order.id}`} value={order.payment_status} disabled={busy || order.status === 'Скасовано'} onChange={(event) => void onChange(order, 'payment_status', event.target.value)}><option>Очікує оплати</option><option>Оплачено</option></select></label>
-                    {role === 'director' && <label>Статус замовлення{order.status === 'Скасовано'
+                    {role === 'accountant' && <label>Оплата<select aria-label={`Статус оплати замовлення ${order.id}`} value={order.payment_status} disabled={busy || order.status === 'Скасовано'} onChange={(event) => void onChange(order, 'payment_status', event.target.value)}><option>Очікує оплати</option><option>Оплачено</option></select></label>}
+                    {(role === 'director' || role === 'manager') && <label>Статус замовлення{order.status === 'Скасовано'
                       ? <span className="badge badge-muted">Скасовано</span>
                       : <select aria-label={`Статус замовлення ${order.id}`} value={order.status || 'Нове'} disabled={busy} onChange={(event) => void onChange(order, 'status', event.target.value)}><option>Нове</option><option>Комплектується</option><option>Доставляється</option><option>Виконано</option></select>}</label>}
                   </div>
@@ -656,9 +663,15 @@ function InventoryPanel({
 }) {
   return (
     <>
-      <SectionHeader eyebrow="АСОРТИМЕНТ І ЗАЛИШКИ" title="Каталог інструменту" description="Оновлюйте дані про інструменти, постачальників, залишки й ціни." />
-      <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Облік товарів</h2><p>Товар із нульовим залишком автоматично зникає з можливості замовлення.</p></div></div>
-        <div className="table-scroll"><table><thead><tr><th>Товар</th><th>Категорія</th><th>Постачальник</th><th>Ціна</th><th>Залишок</th><th /></tr></thead><tbody>{products.map((product) => <tr key={product.sku}><td><strong>{product.name}</strong></td><td>{product.category_name}</td><td><select form={`product-${product.sku}`} name="supplier_id" defaultValue={product.supplier_id || ''}><option value="">Не обрано</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select>{!product.supplier_id && product.supplier && <small className="cell-subtitle">Старий запис: {product.supplier}</small>}</td><td colSpan={3}><form id={`product-${product.sku}`} className="product-edit-row" onSubmit={(event) => { event.preventDefault(); void onSave(new FormData(event.currentTarget), product.sku) }}><label className="visually-hidden">Ціна<input name="price" type="number" min="0" step="0.01" defaultValue={(product.price / 100).toFixed(2)} /></label><span className="unit-label">₴</span><label className="visually-hidden">Залишок<input name="stock" type="number" min="0" max="100000" step="1" defaultValue={product.stock} /></label><span className={`stock-label${product.stock <= 5 ? ' low' : ''}`}>{product.stock} {product.unit}</span><button className="button button-outline compact-button" type="submit" disabled={busy}>Зберегти</button></form></td></tr>)}</tbody></table></div>
+      <SectionHeader eyebrow="АСОРТИМЕНТ І ЗАЛИШКИ" title="Каталог інструменту" description="Керуйте ціною за одиницю, фактичною кількістю на складі та постачальниками." />
+      <div className="inventory-summary">
+        <Stat label="Позицій у каталозі" value={String(products.length)} icon={<Boxes />} />
+        <Stat label="Є в наявності" value={String(products.filter((product) => product.stock > 0).length)} icon={<Package />} tone="green" />
+        <Stat label="Потрібно поповнити" value={String(products.filter((product) => product.stock <= 5).length)} icon={<CalendarClock />} tone="warning" />
+        <Stat label="Вартість залишків за цінами каталогу" value={formatMoney(products.reduce((sum, product) => sum + product.price * product.stock, 0))} icon={<BadgeDollarSign />} />
+      </div>
+      <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Облік товарів</h2><p>Вартість залишку = ціна за одиницю × кількість. Нульовий залишок прибирає товар з можливості замовлення.</p></div></div>
+        <div className="table-scroll"><table><thead><tr><th>Товар</th><th>Категорія</th><th>Постачальник</th><th>Ціна за одиницю</th><th>Кількість на складі</th><th>Вартість залишку</th><th /></tr></thead><tbody>{products.map((product) => <tr key={product.sku}><td><strong>{product.name}</strong></td><td>{product.category_name}</td><td><select form={`product-${product.sku}`} name="supplier_id" defaultValue={product.supplier_id || ''}><option value="">Не обрано</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select>{!product.supplier_id && product.supplier && <small className="cell-subtitle">Старий запис: {product.supplier}</small>}</td><td><label className="unit-price-field"><span className="visually-hidden">Ціна за одиницю у гривнях</span><input form={`product-${product.sku}`} name="price" type="number" min="0" step="0.01" defaultValue={(product.price / 100).toFixed(2)} /><span>₴ / {product.unit}</span></label></td><td><label className="stock-edit-field"><span className="visually-hidden">Кількість на складі</span><input form={`product-${product.sku}`} name="stock" type="number" min="0" max="100000" step="1" defaultValue={product.stock} /><span>{product.unit}</span></label></td><td><strong>{formatMoney(product.price * product.stock)}</strong></td><td><form id={`product-${product.sku}`} className="product-edit-row" onSubmit={(event) => { event.preventDefault(); void onSave(new FormData(event.currentTarget), product.sku) }}><button className="button button-outline compact-button" type="submit" disabled={busy}>Зберегти</button></form></td></tr>)}</tbody></table></div>
       </div>
     </>
   )
@@ -679,7 +692,7 @@ function TeamPanel({
       <SectionHeader eyebrow="КОМАНДА" title="Працівники та доступи" description="Кожен працівник має власний профіль із доступом відповідно до посади." />
       <div className="admin-two-column">
         <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Працівники</h2><p>Спочатку ім’я та прізвище, далі посада, присутність і доступ.</p></div></div><div className="table-scroll"><table><thead><tr><th>Ім’я та прізвище / логін</th><th>Посада</th><th>Статус</th><th>Доступ</th><th /></tr></thead><tbody>{staff.map((record) => <StaffRow key={record.id} record={record} currentUserId={currentUserId} busy={busy} onUpdate={onUpdate} onDelete={onDelete} />)}</tbody></table></div></div>
-        <form className="panel-card form-stack" onSubmit={(event) => void onCreate(event)}><div className="panel-heading"><div><h2>Додати працівника</h2><p>Створіть обліковий запис і виберіть роль.</p></div><Plus size={18} /></div><label>Ім’я та прізвище<input name="name" minLength={3} maxLength={100} pattern=".*\s+.*" title="Вкажіть ім’я та прізвище" placeholder="Наприклад, Олена Коваль" required /></label><label>Логін<input name="username" pattern="[A-Za-z0-9_.-]{3,32}" required /></label><label>Посада<select name="role"><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option><option value="director">Директор</option></select></label><label>Тимчасовий пароль<input name="password" type="password" minLength={12} maxLength={128} required /><small>Щонайменше 12 символів.</small></label><button className="button button-dark button-full" type="submit" disabled={busy}>Додати працівника <Plus size={16} /></button></form>
+        <form className="panel-card form-stack" onSubmit={(event) => void onCreate(event)}><div className="panel-heading"><div><h2>Додати працівника</h2><p>Створіть обліковий запис і виберіть посаду.</p></div><Plus size={18} /></div><label>Ім’я та прізвище<input name="name" minLength={3} maxLength={100} pattern=".*\s+.*" title="Вкажіть ім’я та прізвище" placeholder="Наприклад, Олена Коваль" required /></label><label>Логін<input name="username" pattern="[A-Za-z0-9_.-]{3,32}" required /></label><label>Посада<select name="role"><option value="manager">Менеджер продажу</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option><option value="director">Директор</option></select></label><label>Тимчасовий пароль<input name="password" type="password" minLength={12} maxLength={128} required /><small>Щонайменше 12 символів.</small></label><button className="button button-dark button-full" type="submit" disabled={busy}>Додати працівника <Plus size={16} /></button></form>
       </div>
     </>
   )
@@ -696,7 +709,7 @@ function StaffRow({
 }) {
   const [role, setRole] = useState<StaffRole>(record.role)
   const [active, setActive] = useState(record.active)
-  return <tr><td><strong>{record.name}</strong><small className="cell-subtitle">{record.username}</small></td><td><select value={role} disabled={record.role === 'director'} onChange={(event) => setRole(event.target.value as StaffRole)}><option value="director">Директор</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option></select></td><td><span className="badge status-badge-white">{record.work_status}</span></td><td><div className="team-access-control"><span className={`badge ${active ? 'status-badge-white' : 'badge-muted'}`}>{active ? record.role === 'director' ? 'Повний доступ' : 'Доступ надано' : 'Доступ вимкнено'}</span><button className="access-toggle" type="button" disabled={busy || record.id === currentUserId} onClick={() => setActive((value) => !value)}>{active ? 'Вимкнути' : 'Увімкнути'}</button></div></td><td><div className="team-row-actions"><button className="button button-outline compact-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onUpdate(record, role, active)}>Зберегти</button>{record.role !== 'director' && <button className="button button-outline team-delete-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onDelete(record)}><Trash2 size={14} /> Видалити</button>}</div></td></tr>
+  return <tr><td><strong>{record.name}</strong><small className="cell-subtitle">{record.username}</small></td><td><select value={role} disabled={record.role === 'director'} onChange={(event) => setRole(event.target.value as StaffRole)}><option value="manager">Менеджер продажу</option><option value="director">Директор</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option></select></td><td><span className="badge status-badge-white">{record.work_status}</span></td><td><div className="team-access-control"><span className={`badge ${active ? 'status-badge-white' : 'badge-muted'}`}>{active ? record.role === 'director' ? 'Повний доступ' : 'Доступ надано' : 'Доступ вимкнено'}</span><button className="access-toggle" type="button" disabled={busy || record.id === currentUserId} onClick={() => setActive((value) => !value)}>{active ? 'Вимкнути' : 'Увімкнути'}</button></div></td><td><div className="team-row-actions"><button className="button button-outline compact-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onUpdate(record, role, active)}>Зберегти</button>{record.role !== 'director' && <button className="button button-outline team-delete-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onDelete(record)}><Trash2 size={14} /> Видалити</button>}</div></td></tr>
 }
 
 function HistoryPanel({ history }: { history: StatusHistoryEntry[] }) {

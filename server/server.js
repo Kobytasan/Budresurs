@@ -24,7 +24,7 @@ const pool = new Pool({
 const PORT = Number(process.env.PORT || 5000)
 const SESSION_HOURS = 12
 const DELIVERY_CITIES = ['Київ', 'Львів', 'Одеса', 'Дніпро', 'Харків', 'Вінниця', 'Черкаси', 'Полтава']
-const ROLE_LABELS = { director: 'Директор', accountant: 'Бухгалтер', inventory: 'Працівник складу' }
+const ROLE_LABELS = { director: 'Директор', accountant: 'Бухгалтер', inventory: 'Працівник складу', manager: 'Менеджер продажу' }
 const WORK_STATUSES = ['На роботі', 'Вихідний', 'У відпустці', 'Кінець робочого дня']
 
 function localDemoEnabled(req) {
@@ -208,10 +208,13 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY, username VARCHAR(32) NOT NULL UNIQUE,
       name VARCHAR(100) NOT NULL, role VARCHAR(20) NOT NULL
-        CHECK(role IN ('director', 'accountant', 'inventory')),
+        CHECK(role IN ('director', 'accountant', 'inventory', 'manager')),
       password_hash TEXT NOT NULL, work_status VARCHAR(40) NOT NULL DEFAULT 'На роботі',
       active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+    ALTER TABLE users ADD CONSTRAINT users_role_check
+      CHECK(role IN ('director', 'accountant', 'inventory', 'manager'));
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash CHAR(64) PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL
@@ -302,6 +305,9 @@ async function initDB() {
     }
   }
   await pool.query(
+    "UPDATE products SET price = 549900 WHERE sku = 'BR-PERFORATOR-800' AND price = 289900",
+  )
+  await pool.query(
     `UPDATE products SET active = FALSE
      WHERE category = ANY($1::text[])`,
     [[
@@ -343,6 +349,7 @@ async function initDB() {
     const demoEmployees = [
       { username: 'olena.kovalenko', name: 'Олена Коваленко', role: 'accountant' },
       { username: 'andrii.melnyk', name: 'Андрій Мельник', role: 'inventory' },
+      { username: 'marta.shevchenko', name: 'Марта Шевченко', role: 'manager' },
     ]
     for (const employee of demoEmployees) {
       await pool.query(
@@ -851,7 +858,7 @@ async function financials() {
 
 app.get('/api/admin/overview', async (req, res, next) => {
   try {
-    const user = await requireUser(req, res, ['director', 'accountant'])
+    const user = await requireUser(req, res, ['director', 'accountant', 'manager'])
     if (!user) return
     const result = { financials: await financials() }
     if (user.role === 'director') {
@@ -869,9 +876,9 @@ app.get('/api/admin/overview', async (req, res, next) => {
 
 app.get('/api/admin/orders', async (req, res, next) => {
   try {
-    const user = await requireUser(req, res, ['director', 'accountant'])
+    const user = await requireUser(req, res, ['director', 'accountant', 'manager'])
     if (!user) return
-    const fields = user.role === 'director'
+    const fields = user.role === 'director' || user.role === 'manager'
       ? 'o.id, o.created_at, o.total, o.payment_status, o.customer_name, o.phone, o.address, o.status, o.city'
       : 'o.id, o.created_at, o.total, o.payment_status, o.status'
     const { rows } = await pool.query(
@@ -889,7 +896,7 @@ app.get('/api/admin/orders', async (req, res, next) => {
 
 app.patch('/api/admin/orders/:id', async (req, res, next) => {
   try {
-    const user = await requireUser(req, res, ['director', 'accountant'])
+    const user = await requireUser(req, res, ['director', 'accountant', 'manager'])
     if (!user) return
     const updates = []
     const values = []
@@ -898,11 +905,12 @@ app.patch('/api/admin/orders/:id', async (req, res, next) => {
       return apiError(res, 400, 'Некоректні дані замовлення.')
     }
     if ('payment_status' in payload) {
+      if (user.role === 'manager') return apiError(res, 403, 'Змінювати оплату може бухгалтер або директор.')
       if (!['Оплачено', 'Очікує оплати'].includes(payload.payment_status)) return apiError(res, 400, 'Некоректний статус оплати.')
       values.push(payload.payment_status); updates.push(`payment_status = $${values.length}`)
     }
     if ('status' in payload) {
-      if (user.role !== 'director') return apiError(res, 403, 'Керувати статусом замовлення може лише директор.')
+      if (!['director', 'manager'].includes(user.role)) return apiError(res, 403, 'Керувати статусом замовлення може менеджер або директор.')
       if (!['Нове', 'Комплектується', 'Доставляється', 'Виконано'].includes(payload.status)) return apiError(res, 400, 'Некоректний статус замовлення.')
       values.push(payload.status); updates.push(`status = $${values.length}`)
     }
@@ -1130,7 +1138,7 @@ app.post('/api/admin/suppliers', async (req, res, next) => {
 
 app.get('/api/admin/support', async (req, res, next) => {
   try {
-    if (!await requireUser(req, res, ['director'])) return
+    if (!await requireUser(req, res, ['director', 'manager'])) return
     const { rows } = await pool.query(
       'SELECT id, name, email, subject, message, status, created_at FROM support_messages ORDER BY id DESC LIMIT 200',
     )
@@ -1140,7 +1148,7 @@ app.get('/api/admin/support', async (req, res, next) => {
 
 app.patch('/api/admin/support/:id', async (req, res, next) => {
   try {
-    if (!await requireUser(req, res, ['director'])) return
+    if (!await requireUser(req, res, ['director', 'manager'])) return
     const { status } = req.body || {}
     if (!['Нове', 'У роботі', 'Відповіли'].includes(status)) return apiError(res, 400, 'Некоректний статус звернення.')
     const result = await pool.query('UPDATE support_messages SET status = $1 WHERE id = $2', [status, Number(req.params.id)])
