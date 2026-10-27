@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, LogOut, Printer, ReceiptText, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, LogOut, Printer, ReceiptText, ShoppingBag, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api, jsonBody } from '../api'
 import { formatDate, formatMoney } from '../components/Storefront'
@@ -92,6 +92,25 @@ export function AccountPage() {
     }
   }
 
+  async function cancelOrder(order: CustomerOrder) {
+    if (!window.confirm(`Відмовитися від замовлення №${order.id}? Товари повернуться на склад.`)) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await api<{ status: string }>(`/api/customer/orders/${order.id}/cancel`, {
+        method: 'POST',
+        body: jsonBody({}),
+      })
+      setOrders((current) => current.map((item) => item.id === order.id
+        ? { ...item, status: result.status }
+        : item))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не вдалося скасувати замовлення.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!customer) {
     const registering = mode === 'register'
     return (
@@ -138,6 +157,11 @@ export function AccountPage() {
               <div className="order-items">{order.items.map((item, index) => <div key={`${item.product_name}-${index}`}><span>{item.product_name} · {item.quantity} {item.unit}</span><strong>{formatMoney(item.line_total)}</strong></div>)}</div>
               <div className="cart-total"><span>Разом</span><strong>{formatMoney(order.total)}</strong></div>
               <button className="button button-outline" type="button" onClick={() => { setSelectedReceipt(order); window.setTimeout(() => window.print(), 50) }}><ReceiptText size={16} /> Переглянути / друкувати квитанцію <Printer size={15} /></button>
+              {order.status === 'Нове' && order.payment_status !== 'Оплачено' && (
+                <button className="button button-outline cancel-order-button" type="button" disabled={busy} onClick={() => void cancelOrder(order)}>
+                  <XCircle size={16} /> Відмовитися від замовлення
+                </button>
+              )}
             </article>
           ))}</div>
         )}

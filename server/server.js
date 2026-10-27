@@ -217,6 +217,12 @@ async function initDB() {
       customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS customer_favorites (
+      customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      product_sku VARCHAR(50) NOT NULL REFERENCES products(sku) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (customer_id, product_sku)
+    );
     CREATE TABLE IF NOT EXISTS orders (
       id BIGSERIAL PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       customer_name VARCHAR(100) NOT NULL DEFAULT '', phone VARCHAR(20) NOT NULL DEFAULT '',
@@ -469,6 +475,52 @@ app.get('/api/customer/me', async (req, res, next) => {
   } catch (error) { next(error) }
 })
 
+app.get('/api/customer/favorites', async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    const { rows } = await pool.query(
+      `SELECT f.product_sku AS sku FROM customer_favorites f
+       JOIN products p ON p.sku = f.product_sku
+       WHERE f.customer_id = $1 AND p.active
+       ORDER BY f.created_at, f.product_sku`,
+      [customer.id],
+    )
+    res.json({ favorites: rows.map((row) => row.sku) })
+  } catch (error) { next(error) }
+})
+
+app.post('/api/customer/favorites', async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    const sku = text(req.body?.sku, 50)
+    if (!sku) return apiError(res, 400, 'Оберіть товар для улюбленого.')
+    const product = await pool.query('SELECT 1 FROM products WHERE sku = $1 AND active', [sku])
+    if (!product.rowCount) return apiError(res, 404, 'Товар не знайдено.')
+    await pool.query(
+      `INSERT INTO customer_favorites (customer_id, product_sku)
+       VALUES ($1, $2) ON CONFLICT (customer_id, product_sku) DO NOTHING`,
+      [customer.id, sku],
+    )
+    res.status(201).json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+app.delete('/api/customer/favorites/:sku', async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    const sku = text(req.params.sku, 50)
+    if (!sku) return apiError(res, 400, 'Оберіть товар для видалення.')
+    await pool.query(
+      'DELETE FROM customer_favorites WHERE customer_id = $1 AND product_sku = $2',
+      [customer.id, sku],
+    )
+    res.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
 app.post('/api/customer/logout', async (req, res, next) => {
   try {
     const token = getCookie(req, 'prometey_customer_session')
@@ -494,6 +546,54 @@ app.get('/api/customer/orders', async (req, res, next) => {
     )
     res.json({ orders: rows })
   } catch (error) { next(error) }
+})
+
+app.post('/api/customer/orders/:id/cancel', async (req, res, next) => {
+  let client
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    const orderId = Number(req.params.id)
+    if (!Number.isSafeInteger(orderId) || orderId < 1) {
+      return apiError(res, 400, 'Некоректний номер замовлення.')
+    }
+
+    client = await pool.connect()
+    await client.query('BEGIN')
+    const result = await client.query(
+      `SELECT id, status, payment_status FROM orders
+       WHERE id = $1 AND customer_id = $2 FOR UPDATE`,
+      [orderId, customer.id],
+    )
+    const order = result.rows[0]
+    if (!order) {
+      await client.query('ROLLBACK')
+      return apiError(res, 404, 'Замовлення не знайдено.')
+    }
+    if (order.status !== 'Нове' || order.payment_status === 'Оплачено') {
+      await client.query('ROLLBACK')
+      return apiError(res, 409, 'Це замовлення вже не можна скасувати. Зверніться до підтримки.')
+    }
+
+    const items = await client.query(
+      'SELECT product_sku, quantity FROM order_items WHERE order_id = $1',
+      [orderId],
+    )
+    for (const item of items.rows) {
+      await client.query(
+        'UPDATE products SET stock = stock + $1 WHERE sku = $2',
+        [item.quantity, item.product_sku],
+      )
+    }
+    await client.query("UPDATE orders SET status = 'Скасовано' WHERE id = $1", [orderId])
+    await client.query('COMMIT')
+    res.json({ ok: true, status: 'Скасовано' })
+  } catch (error) {
+    if (client) await client.query('ROLLBACK')
+    next(error)
+  } finally {
+    client?.release()
+  }
 })
 
 app.post('/api/orders', async (req, res, next) => {
@@ -576,7 +676,8 @@ async function financials() {
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS order_count, COALESCE(SUM(total),0)::int AS revenue,
      COALESCE(SUM(total) FILTER (WHERE payment_status = 'Оплачено'),0)::int AS paid,
-     COALESCE(SUM(total) FILTER (WHERE payment_status <> 'Оплачено'),0)::int AS due FROM orders`,
+     COALESCE(SUM(total) FILTER (WHERE payment_status <> 'Оплачено'),0)::int AS due
+     FROM orders WHERE COALESCE(status, '') <> 'Скасовано'`,
   )
   return rows[0]
 }
@@ -605,7 +706,7 @@ app.get('/api/admin/orders', async (req, res, next) => {
     if (!user) return
     const fields = user.role === 'director'
       ? 'id, created_at, total, payment_status, customer_name, phone, address, status, city'
-      : 'id, created_at, total, payment_status'
+      : 'id, created_at, total, payment_status, status'
     const { rows } = await pool.query(`SELECT ${fields} FROM orders ORDER BY id DESC LIMIT 100`)
     res.json({ orders: rows })
   } catch (error) { next(error) }
@@ -630,9 +731,21 @@ app.patch('/api/admin/orders/:id', async (req, res, next) => {
       if (!['Нове', 'Комплектується', 'Доставляється', 'Виконано'].includes(payload.status)) return apiError(res, 400, 'Некоректний статус замовлення.')
       values.push(payload.status); updates.push(`status = $${values.length}`)
     }
-    values.push(Number(req.params.id))
-    const result = await pool.query(`UPDATE orders SET ${updates.join(', ')} WHERE id = $${values.length}`, values)
-    if (!result.rowCount) return apiError(res, 404, 'Замовлення не знайдено.')
+    const orderId = Number(req.params.id)
+    if (!Number.isSafeInteger(orderId) || orderId < 1) return apiError(res, 400, 'Некоректний номер замовлення.')
+    values.push(orderId)
+    const result = await pool.query(
+      `UPDATE orders SET ${updates.join(', ')}
+       WHERE id = $${values.length} AND COALESCE(status, '') <> 'Скасовано'
+       RETURNING id`,
+      values,
+    )
+    if (!result.rowCount) {
+      const existing = await pool.query('SELECT id FROM orders WHERE id = $1', [orderId])
+      return apiError(res, existing.rowCount ? 409 : 404, existing.rowCount
+        ? 'Скасоване замовлення не можна змінювати.'
+        : 'Замовлення не знайдено.')
+    }
     res.json({ ok: true })
   } catch (error) { next(error) }
 })

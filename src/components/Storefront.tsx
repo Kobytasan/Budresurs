@@ -46,7 +46,7 @@ function CityPicker() {
 }
 
 export function PublicLayout() {
-  const { cart, favorites, toast } = useStore()
+  const { cart, favorites, customer, toast } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
   const location = useLocation()
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0)
@@ -76,7 +76,7 @@ export function PublicLayout() {
         </nav>
         <div className="store-actions">
           <CityPicker />
-          <Link className="icon-link favorite-link" to="/products#favorites" aria-label={`Улюблене, ${favorites.length}`}>
+          <Link className="icon-link favorite-link" to="/products#favorites" aria-label={`Улюблене${customer ? ' у вашому кабінеті' : ''}, ${favorites.length}`}>
             <Heart size={19} />
             <span>Обране</span>
             {favorites.length > 0 && <b>{favorites.length}</b>}
@@ -233,7 +233,7 @@ export function ProductArt({ product, compact = false }: { product: Product; com
 }
 
 export function ProductCard({ product }: { product: Product }) {
-  const { cart, favorites, adjustCart, toggleFavorite, showToast } = useStore()
+  const { cart, favorites, favoritesLoading, adjustCart, toggleFavorite, showToast } = useStore()
   const quantity = cart[product.sku] || 0
   const isFavorite = favorites.includes(product.sku)
   const unavailable = product.stock < 1
@@ -257,10 +257,8 @@ export function ProductCard({ product }: { product: Product }) {
           type="button"
           aria-label={isFavorite ? 'Видалити з улюбленого' : 'Додати до улюбленого'}
           aria-pressed={isFavorite}
-          onClick={() => {
-            toggleFavorite(product.sku)
-            showToast(isFavorite ? 'Видалено з улюбленого' : 'Додано до улюбленого')
-          }}
+          disabled={favoritesLoading}
+          onClick={() => void toggleFavorite(product.sku)}
         ><Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} /></button>
       </div>
       <div className="product-info">

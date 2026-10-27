@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -20,6 +21,7 @@ interface StoreValue {
   productsError: string
   cart: Record<string, number>
   favorites: string[]
+  favoritesLoading: boolean
   cities: string[]
   city: string
   customer: Customer | null
@@ -28,7 +30,7 @@ interface StoreValue {
   setCity: (city: string) => void
   adjustCart: (sku: string, change: number) => void
   removeFromCart: (sku: string) => void
-  toggleFavorite: (sku: string) => void
+  toggleFavorite: (sku: string) => Promise<void>
   refreshProducts: () => Promise<void>
   showToast: (message: string) => void
 }
@@ -80,12 +82,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [productsError, setProductsError] = useState('')
   const [cart, setCart] = useState(readCart)
   const [favorites, setFavorites] = useState(readFavorites)
+  const [favoritesLoading, setFavoritesLoading] = useState(false)
   const [cities, setCities] = useState<string[]>([])
   const [city, setCityState] = useState(
     () => localStorage.getItem(CITY_KEY) || 'Київ',
   )
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [toast, setToast] = useState('')
+  const favoritesRef = useRef(favorites)
+  const customerIdRef = useRef<number | null>(null)
+  const visibleFavorites = customerIdRef.current === (customer?.id ?? null) ? favorites : []
+  const visibleFavoritesLoading =
+    favoritesLoading || customerIdRef.current !== (customer?.id ?? null)
   const showToast = useCallback((message: string) => {
     setToast(message)
   }, [])
@@ -142,12 +150,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [showToast])
 
   useEffect(() => {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart))
-  }, [cart])
+    let active = true
+    const customerId = customer?.id ?? null
+    customerIdRef.current = customerId
+    setFavoritesLoading(customerId !== null)
+
+    if (customerId === null) {
+      const guestFavorites = readFavorites()
+      favoritesRef.current = guestFavorites
+      setFavorites(guestFavorites)
+      return () => { active = false }
+    }
+
+    favoritesRef.current = []
+    setFavorites([])
+    void api<unknown>('/api/customer/favorites')
+      .then((result) => {
+        const saved = responseArray<string>(result, 'favorites')
+        if (!saved.every((sku) => typeof sku === 'string')) {
+          throw new Error('Сервер повернув некоректний список улюблених товарів.')
+        }
+        if (active && customerIdRef.current === customerId) {
+          favoritesRef.current = [...new Set(saved)]
+          setFavorites(favoritesRef.current)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active || customerIdRef.current !== customerId) return
+        showToast(error instanceof Error ? error.message : 'Не вдалося завантажити улюблене.')
+      })
+      .finally(() => {
+        if (active && customerIdRef.current === customerId) setFavoritesLoading(false)
+      })
+    return () => { active = false }
+  }, [customer?.id, showToast])
 
   useEffect(() => {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites))
-  }, [favorites])
+    localStorage.setItem(CART_KEY, JSON.stringify(cart))
+  }, [cart])
 
   useEffect(() => {
     localStorage.setItem(CITY_KEY, city)
@@ -187,18 +227,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const toggleFavorite = useCallback((sku: string) => {
-    setFavorites((current) => current.includes(sku)
-      ? current.filter((item) => item !== sku)
-      : [...current, sku])
-  }, [])
+  const toggleFavorite = useCallback(async (sku: string) => {
+    const customerId = customer?.id ?? null
+    if (favoritesLoading || customerIdRef.current !== customerId) {
+      showToast('Зачекайте, поки завантажиться ваше обране.')
+      return
+    }
+    const wasFavorite = favoritesRef.current.includes(sku)
+    const updated = wasFavorite
+      ? favoritesRef.current.filter((item) => item !== sku)
+      : [...favoritesRef.current, sku]
+    favoritesRef.current = updated
+    setFavorites(updated)
+
+    if (customerId === null) {
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated))
+      showToast(wasFavorite ? 'Видалено з улюбленого' : 'Додано до улюбленого')
+      return
+    }
+
+    try {
+      await api(`/api/customer/favorites${wasFavorite ? `/${encodeURIComponent(sku)}` : ''}`, {
+        method: wasFavorite ? 'DELETE' : 'POST',
+        ...(wasFavorite ? {} : { body: JSON.stringify({ sku }) }),
+      })
+      showToast(wasFavorite ? 'Видалено з улюбленого' : 'Додано до улюбленого')
+    } catch (error) {
+      if (customerIdRef.current === customerId) {
+        const current = favoritesRef.current
+        const rolledBack = wasFavorite
+          ? [...new Set([...current, sku])]
+          : current.filter((item) => item !== sku)
+        favoritesRef.current = rolledBack
+        setFavorites(rolledBack)
+      }
+      showToast(error instanceof Error ? error.message : 'Не вдалося зберегти улюблене.')
+    }
+  }, [customer?.id, favoritesLoading, showToast])
 
   const value = useMemo<StoreValue>(() => ({
     products,
     productsLoading,
     productsError,
     cart,
-    favorites,
+    favorites: visibleFavorites,
+    favoritesLoading: visibleFavoritesLoading,
     cities,
     city,
     customer,
@@ -211,7 +284,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refreshProducts,
     showToast,
   }), [
-    products, productsLoading, productsError, cart, favorites, cities, city,
+    products, productsLoading, productsError, cart, favorites, favoritesLoading,
+    visibleFavorites, visibleFavoritesLoading, cities, city,
     customer, toast, setCity, adjustCart, removeFromCart, toggleFavorite,
     refreshProducts, showToast,
   ])

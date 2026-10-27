@@ -26,6 +26,8 @@ body, button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
 a { color: inherit; text-decoration: none; }
+.storefront { min-height: 100vh; display: flex; flex-direction: column; }
+.storefront > main { flex: 1 0 auto; width: 100%; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 3px solid #e8a838;
   outline-offset: 2px;
@@ -208,6 +210,8 @@ h1, h2, h3, p { margin-top: 0; }
 .order-items { display: grid; gap: 8px; padding: 14px 0; }
 .order-items > div { display: flex; justify-content: space-between; gap: 12px; color: #68645d; font-size: 11px; }
 .customer-order-card > .button { margin-top: 15px; }
+.customer-order-card > .cancel-order-button { margin-left: 8px; border-color: #e8caca; color: #a33e35; }
+.customer-order-card > .cancel-order-button:hover:not(:disabled) { border-color: #c85655; background: #fff6f5; }
 .receipt-print { display: none; }
 .receipt-brand { color: var(--dark); font-family: Manrope, sans-serif; font-size: 24px; font-weight: 800; }
 .receipt-brand small { display: block; color: #716b60; font-family: "DM Sans", sans-serif; font-size: 10px; font-weight: 400; }
