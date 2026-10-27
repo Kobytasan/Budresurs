@@ -16,14 +16,19 @@ from urllib.parse import unquote, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(
-    os.environ.get("PROMETEY_DB_PATH", str(BASE_DIR / "data" / "prometey.db"))
+    os.environ.get(
+        "BUDRESURS_DB_PATH",
+        os.environ.get("PROMETEY_DB_PATH", str(BASE_DIR / "data" / "prometey.db")),
+    )
 ).expanduser().resolve()
 DB_DIR = DB_PATH.parent
 CATALOG_DIR = BASE_DIR / "catalogs"
 FRONTEND_DIST = BASE_DIR / "dist"
 SESSION_HOURS = 12
 PBKDF2_ITERATIONS = 310_000
-DEMO_MODE_ENABLED = os.environ.get("PROMETEY_DEMO_MODE", "1") == "1"
+DEMO_MODE_ENABLED = os.environ.get(
+    "BUDRESURS_DEMO_MODE", os.environ.get("PROMETEY_DEMO_MODE", "1")
+) == "1"
 ROLES = {"director", "accountant", "inventory"}
 WORK_STATUSES = {
     "На роботі", "Вихідний", "У відпустці", "Кінець робочого дня",
@@ -267,7 +272,8 @@ def init_db():
                 )
 
         director_password = os.environ.get(
-            "PROMETEY_ADMIN_PASSWORD", "BudresursDemo2026!"
+            "BUDRESURS_ADMIN_PASSWORD",
+            os.environ.get("PROMETEY_ADMIN_PASSWORD", "BudresursDemo2026!"),
         )
         if not db.execute(
             "SELECT 1 FROM users WHERE username = 'director'"
@@ -277,16 +283,16 @@ def init_db():
                 "VALUES (?, ?, ?, ?, ?)",
                 (
                     "director",
-                    "Директор магазину",
+                    "Директор Будресурс",
                     "director",
                     hash_password(director_password),
                     utc_now(),
                 ),
             )
-            if "PROMETEY_ADMIN_PASSWORD" not in os.environ:
+            if not os.environ.get("BUDRESURS_ADMIN_PASSWORD") and not os.environ.get("PROMETEY_ADMIN_PASSWORD"):
                 print(
                     "УВАГА: використовується демонстраційний пароль директора. "
-                    "Задайте змінну PROMETEY_ADMIN_PASSWORD перед запуском.",
+                    "Задайте змінну BUDRESURS_ADMIN_PASSWORD перед запуском.",
                     file=sys.stderr,
                 )
         for user in db.execute(
@@ -447,7 +453,9 @@ class StoreHandler(BaseHTTPRequestHandler):
         return urlparse(origin).netloc == self.headers.get("Host")
 
     def cookie_secure_attribute(self):
-        secure = os.environ.get("PROMETEY_COOKIE_SECURE") == "1"
+        secure = os.environ.get(
+            "BUDRESURS_COOKIE_SECURE", os.environ.get("PROMETEY_COOKIE_SECURE")
+        ) == "1"
         secure = secure or self.headers.get("X-Forwarded-Proto", "").lower() == "https"
         return "; Secure" if secure else ""
 
@@ -1351,13 +1359,15 @@ class StoreHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    host = os.environ.get("PROMETEY_HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", os.environ.get("PROMETEY_PORT", "8000")))
+    host = os.environ.get("BUDRESURS_HOST", os.environ.get("PROMETEY_HOST", "127.0.0.1"))
+    port = int(os.environ.get("PORT", os.environ.get("BUDRESURS_PORT", os.environ.get("PROMETEY_PORT", "8000"))))
     public_host = host.lower() not in {"127.0.0.1", "localhost", "::1"}
-    admin_password = os.environ.get("PROMETEY_ADMIN_PASSWORD", "")
+    admin_password = os.environ.get(
+        "BUDRESURS_ADMIN_PASSWORD", os.environ.get("PROMETEY_ADMIN_PASSWORD", "")
+    )
     if public_host and len(admin_password) < 12:
         raise SystemExit(
-            "Для запуску в мережі задайте PROMETEY_ADMIN_PASSWORD довжиною "
+            "Для запуску в мережі задайте BUDRESURS_ADMIN_PASSWORD довжиною "
             "щонайменше 12 символів перед створенням бази."
         )
     init_db()

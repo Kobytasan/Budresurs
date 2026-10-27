@@ -454,7 +454,7 @@ export function StaffPage() {
         </nav>
         <button className="sidebar-user" type="button" onClick={() => { setActiveTab('profile'); setMobileMenu(false); setError(''); setNotice('') }} aria-label="Відкрити мій профіль">
           <span className="avatar">{user.name.trim().slice(0, 1).toLocaleUpperCase('uk')}</span>
-          <span><strong>{user.name}</strong><small>{roleNames[user.role]}</small></span>
+          <span><strong>{user.name === 'Директор магазину' ? 'Директор Будресурс' : user.name}</strong><small>{roleNames[user.role]}</small></span>
         </button>
         <button className="sidebar-logout" type="button" onClick={() => void signOut()} disabled={busy}><LogOut size={16} />Вийти</button>
       </aside>

@@ -11,6 +11,10 @@ dotenv.config()
 const { Pool } = pg
 const app = express()
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+function setting(name, legacyName) {
+  return process.env[name] || (legacyName ? process.env[legacyName] : '')
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes('localhost')
@@ -24,7 +28,7 @@ const ROLE_LABELS = { director: 'Директор', accountant: 'Бухгалт�
 const WORK_STATUSES = ['На роботі', 'Вихідний', 'У відпустці', 'Кінець робочого дня']
 
 function localDemoEnabled(req) {
-  return process.env.PROMETEY_DEMO_MODE === '1'
+  return setting('BUDRESURS_DEMO_MODE', 'PROMETEY_DEMO_MODE') === '1'
     && !process.env.RENDER
     && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip)
 }
@@ -86,7 +90,7 @@ function cookieOptions(req, maxAge) {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.PROMETEY_COOKIE_SECURE === '1' || req.secure,
+    secure: setting('BUDRESURS_COOKIE_SECURE', 'PROMETEY_COOKIE_SECURE') === '1' || req.secure,
     path: '/',
     maxAge,
   }
@@ -317,12 +321,17 @@ async function initDB() {
       [category.slug, category.name],
     )
   }
-  const directorUsername = process.env.PROMETEY_ADMIN_USERNAME || 'director'
-  const adminPassword = process.env.PROMETEY_ADMIN_PASSWORD || ''
+  const directorUsername = setting('BUDRESURS_ADMIN_USERNAME', 'PROMETEY_ADMIN_USERNAME') || 'director'
+  const adminPassword = setting('BUDRESURS_ADMIN_PASSWORD', 'PROMETEY_ADMIN_PASSWORD')
+  await pool.query(
+    `UPDATE users SET name = 'Директор Будресурс'
+     WHERE username = $1 AND name = 'Директор магазину'`,
+    [directorUsername],
+  )
   const existingDirector = await pool.query('SELECT 1 FROM users WHERE username = $1', [directorUsername])
   if (existingDirector.rowCount === 0) {
     if (adminPassword.length < 12) {
-      throw new Error('Для створення директора задайте PROMETEY_ADMIN_PASSWORD довжиною щонайменше 12 символів.')
+      throw new Error('Для створення директора задайте BUDRESURS_ADMIN_PASSWORD довжиною щонайменше 12 символів.')
     }
     await pool.query(
       `INSERT INTO users (username, name, role, password_hash)
@@ -330,7 +339,7 @@ async function initDB() {
       [directorUsername, hashPassword(adminPassword)],
     )
   }
-  if (process.env.PROMETEY_DEMO_MODE === '1' && !process.env.RENDER) {
+  if (setting('BUDRESURS_DEMO_MODE', 'PROMETEY_DEMO_MODE') === '1' && !process.env.RENDER) {
     const demoEmployees = [
       { username: 'olena.kovalenko', name: 'Олена Коваленко', role: 'accountant' },
       { username: 'andrii.melnyk', name: 'Андрій Мельник', role: 'inventory' },

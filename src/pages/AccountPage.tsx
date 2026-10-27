@@ -301,7 +301,7 @@ function Receipt({
         <div className="receipt-toolbar"><strong>Квитанція замовлення</strong><button className="icon-button" type="button" aria-label="Закрити квитанцію" onClick={onClose}><X size={18} /></button></div>
         <div className="receipt-paper" ref={receiptRef}>
           <header className="receipt-heading">
-            <div className="receipt-brand"><span className="brand-mark">Б</span><span><strong>БУДРЕСУРС</strong><small>будівельний інструмент та оснащення</small></span></div>
+            <div className="receipt-brand"><span className="brand-mark">Б</span><span><strong>БУДРЕСУРС</strong><small>інструмент і будматеріали</small></span></div>
             <span className="receipt-label">КВИТАНЦІЯ ОНЛАЙН-ЗАМОВЛЕННЯ</span>
           </header>
           <div className="receipt-title-row"><div><span className="eyebrow">КАТАЛОГ «БУДРЕСУРС»</span><h1 id="receipt-title">Замовлення №{order.id}</h1></div><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'badge-green'}`}>{order.status}</span></div>

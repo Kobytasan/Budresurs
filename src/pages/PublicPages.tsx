@@ -23,9 +23,9 @@ export function HomePage() {
     <>
       <section className="hero">
         <div className="hero-copy">
-          <span className="eyebrow">БУДІВЕЛЬНИЙ ІНСТРУМЕНТ · ПЕРЕВІРЕНИЙ ВИБІР</span>
-          <h1>Точний інструмент.<br /><em>Надійний результат.</em></h1>
-          <p>Каталог «Будресурс» — електроінструмент, оснащення та засоби захисту для майстрів і будівельних команд.</p>
+          <span className="eyebrow">ІНСТРУМЕНТ · ОСНАЩЕННЯ · БУДМАТЕРІАЛИ</span>
+          <h1>Усе для будівництва.<br /><em>В одному місці.</em></h1>
+          <p>Підберіть інструмент і матеріали для ремонту, монтажу та робіт на будівельному майданчику.</p>
           <Link className="button button-dark" to="/products">Переглянути каталог <ArrowRight size={17} /></Link>
           <div className="hero-proof"><span>✓</span> Зрозумілі характеристики · актуальна наявність</div>
         </div>
@@ -36,7 +36,7 @@ export function HomePage() {
             <div className="hero-tool-card"><Ruler size={42} strokeWidth={1.4} /><span>Вимірювання</span></div>
             <div className="hero-tool-badge"><HardHat size={20} /> ВИБІР МАЙСТРІВ</div>
           </div>
-          <div className="hero-visual-caption"><Wrench size={18} /> Інструмент, що працює</div>
+          <div className="hero-visual-caption"><Wrench size={18} /> Від інструменту до оснащення</div>
         </div>
       </section>
       {productsError && (
@@ -49,12 +49,12 @@ export function HomePage() {
       )}
       <section className="metrics-strip" aria-label="Каталог">
         <div><strong>{products.length}</strong><span>позицій каталогу</span></div>
-        <div><strong>{categories.length}</strong><span>категорій інструменту</span></div>
+        <div><strong>{categories.length}</strong><span>категорій для будівництва</span></div>
         <div><strong>{cities.length}</strong><span>міст обслуговування</span></div>
         <div><strong>{outOfStock}</strong><span>позицій очікують поставки</span></div>
       </section>
       <section className="home-section">
-        <div className="section-intro"><span className="eyebrow">КАТАЛОГ «БУДРЕСУРС»</span><h2>Усе для роботи на об’єкті</h2><p>Оберіть категорію, порівняйте характеристики та перевірте наявність перед замовленням.</p></div>
+        <div className="section-intro"><span className="eyebrow">КАТАЛОГ «БУДРЕСУРС»</span><h2>Зберіть усе для свого проєкту</h2><p>Інструмент, оснащення та матеріали для щоденних робіт — з описами й актуальною наявністю.</p></div>
         <div className="category-cards">
           {categories.slice(0, 6).map((category, index) => (
             <Link className={`category-card tone-${index % 4}`} to={`/products?category=${encodeURIComponent(category.slug)}`} key={category.slug}>
@@ -120,9 +120,9 @@ export function CatalogPage() {
   return (
     <section className="catalog-section page-width">
       <SectionHeader
-        eyebrow="ІНСТРУМЕНТ ТА ОСНАЩЕННЯ"
-        title={showingFavorites ? 'Обране' : 'Каталог інструменту'}
-        description={`${visibleProducts.length} ${visibleProducts.length === 1 ? 'позиція' : 'позицій'} · перегляньте наявність і виберіть потрібне для роботи`}
+        eyebrow="ІНСТРУМЕНТИ ТА БУДІВЕЛЬНЕ ОСНАЩЕННЯ"
+        title={showingFavorites ? 'Обране' : 'Каталог для будівництва'}
+        description={`${visibleProducts.length} ${visibleProducts.length === 1 ? 'позиція' : 'позицій'} · інструмент, кріплення та оснащення для ваших робіт`}
       />
       <div className="catalog-tools">
         <label className="search-field"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Знайти інструмент…" aria-label="Пошук інструменту" /></label>
@@ -160,7 +160,7 @@ export function CatalogPage() {
 export function AboutPage() {
   return (
     <section className="info-page page-width">
-      <SectionHeader eyebrow="ПРО «БУДРЕСУРС»" title="Надійний інструмент для вашої справи." description="Каталог будівельних інструментів, де зручно підібрати оснащення, перевірити наявність і оформити замовлення." />
+      <SectionHeader eyebrow="ПРО «БУДРЕСУРС»" title="Постачання для будівництва без зайвих клопотів." description="Каталог інструментів, кріплення й будівельного оснащення для майстрів, ремонтних бригад і будівельних команд." />
       <div className="info-card-grid">
         <article className="info-card"><span><Drill size={21} /></span><h2>Для майстрів і команд</h2><p>Електроінструмент, ручний інструмент, оснащення та засоби захисту зібрані в одному каталозі.</p></article>
         <article className="info-card"><span><ShieldCheck size={21} /></span><h2>Зрозумілий вибір</h2><p>Переглядайте описи, ціни та складські залишки, щоб підготуватися до роботи без зайвих пошуків.</p></article>

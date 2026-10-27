@@ -2,10 +2,18 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
+  Boxes,
+  Cog,
+  Drill,
+  Hammer,
+  HardHat,
   Heart,
+  Package,
   PackageCheck,
+  Ruler,
   ShoppingBag,
   ShoppingCart,
+  Wrench,
   X,
 } from 'lucide-react'
 import { api, jsonBody } from '../api'
@@ -106,7 +114,7 @@ export function PublicLayout() {
       <header className="store-header">
         <Link className="brand" to="/" aria-label="Будресурс — на головну">
           <span className="brand-mark">Б</span>
-          <span><strong>БУДРЕСУРС</strong><small>інструмент для будівництва</small></span>
+          <span><strong>БУДРЕСУРС</strong><small>інструмент і будматеріали</small></span>
         </Link>
         <nav className="store-nav" aria-label="Головна навігація">
           <NavLink to="/" end>Головна</NavLink>
@@ -148,9 +156,9 @@ export function PublicLayout() {
       <footer className="store-footer">
         <Link className="brand footer-brand" to="/">
           <span className="brand-mark">Б</span>
-          <span><strong>БУДРЕСУРС</strong><small>інструмент для будівництва</small></span>
+          <span><strong>БУДРЕСУРС</strong><small>інструмент і будматеріали</small></span>
         </Link>
-        <p>Надійний інструмент для точного результату.</p>
+        <p>Усе потрібне для робіт на об’єкті.</p>
         <div><Link to="/products">Каталог</Link><Link to="/about">Про нас</Link><Link to="/support">Контакти</Link><Link to="/admin">Кабінет команди</Link></div>
       </footer>
       {cartOpen && <CartDrawer onClose={() => setCartOpen(false)} />}
@@ -272,9 +280,28 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
 }
 
 export function ProductArt({ product, compact = false }: { product: Product; compact?: boolean }) {
+  const name = product.name.toLocaleLowerCase('uk')
+  const Icon = name.includes('шліфмашина')
+    ? Cog
+    : name.includes('дриль') || name.includes('перфоратор')
+      ? Drill
+      : name.includes('молоток') || name.includes('пилка')
+        ? Hammer
+        : name.includes('рулетка') || name.includes('рівень')
+          ? Ruler
+          : name.includes('каска') || name.includes('окуляри') || name.includes('рукавиці')
+            ? HardHat
+            : name.includes('саморіз') || name.includes('анкер') || name.includes('свердл')
+              ? Boxes
+              : name.includes('драбина') || name.includes('подовжувач')
+                ? Package
+                : product.category === 'ruchnyi-instrument'
+                  ? Wrench
+                  : Package
+
   return (
     <div className={`product-art-box ${product.color}${compact ? ' compact' : ''}`}>
-      <span className="product-emoji" aria-hidden="true">{product.emoji}</span>
+      <Icon className="product-tool-icon" strokeWidth={1.45} aria-hidden="true" />
     </div>
   )
 }
