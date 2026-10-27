@@ -444,7 +444,7 @@ export function StaffPage() {
   return (
     <div className="admin-shell">
       <aside className={`admin-sidebar${mobileMenu ? ' mobile-open' : ''}`}>
-        <Link to="/" className="admin-brand"><span className="brand-mark">п</span><span><strong>ПРОМЕТЕЙ</strong><small>робочий простір</small></span></Link>
+        <Link to="/" className="admin-brand"><span className="brand-mark">Б</span><span><strong>БУДРЕСУРС</strong><small>операційний центр</small></span></Link>
         <nav aria-label="Розділи кабінету">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" className={activeTab === id ? 'active' : ''} onClick={() => { setActiveTab(id); setMobileMenu(false); setError(''); setNotice('') }}>
@@ -466,7 +466,7 @@ export function StaffPage() {
           <div className="topbar-actions">
             <label className="work-status-picker">Мій статус<select value={workStatus} onChange={(event) => setWorkStatus(event.target.value)}><option>На роботі</option><option>Вихідний</option><option>У відпустці</option><option>Кінець робочого дня</option></select></label>
             <button className="button button-outline compact-button" type="button" onClick={() => void saveWorkStatus()} disabled={busy}><Check size={15} /> Зберегти</button>
-            <Link to="/" className="icon-link"><Store size={17} /><span>До магазину</span></Link>
+            <Link to="/" className="icon-link"><Store size={17} /><span>До каталогу</span></Link>
           </div>
         </header>
         <main className="admin-content">
@@ -534,7 +534,7 @@ function StaffLogin({
   }
   return (
     <section className="staff-login-page">
-      <Link to="/" className="brand"><span className="brand-mark">п</span><span><strong>прометей</strong><small>робочий простір</small></span></Link>
+      <Link to="/" className="brand"><span className="brand-mark">Б</span><span><strong>БУДРЕСУРС</strong><small>робочий простір</small></span></Link>
       <div className="staff-login-card">
         <span className="eyebrow">РАДІ БАЧИТИ ВАС</span><h1>Вхід для команди</h1>
         <p>Увійдіть у робочий простір. Доступні розділи залежать від вашої ролі.</p>
@@ -545,7 +545,7 @@ function StaffLogin({
           <button className="button button-dark button-full" type="submit" disabled={busy}>{busy ? 'Входимо…' : 'Увійти до кабінету'}</button>
         </form>
         {demoStaff.length > 0 && <div className="demo-access"><span className="eyebrow">ЛОКАЛЬНИЙ ДЕМО-ДОСТУП</span><p>Оберіть профіль, щоб переглянути можливості його кабінету.</p><div>{demoStaff.filter((person) => person.active !== false).map((person) => <button key={person.id} type="button" disabled={busy} onClick={() => void onDemoLogin(person.id)}><span className="avatar">{person.name.slice(0, 1)}</span><span><strong>{person.name}</strong><small>{person.role_label}</small></span><ArrowRight size={16} /></button>)}</div></div>}
-        <Link className="back-store-link" to="/">← Повернутися до магазину</Link>
+        <Link className="back-store-link" to="/">← Повернутися до каталогу</Link>
       </div>
     </section>
   )
@@ -572,7 +572,7 @@ function OverviewPanel({
   const finance = overview?.financials
   return (
     <>
-      <SectionHeader eyebrow="ОГЛЯД МАГАЗИНУ" title="Добрий день!" description="Огляд замовлень, надходжень і стану магазину." />
+      <SectionHeader eyebrow="ОГЛЯД «БУДРЕСУРС»" title="Добрий день!" description="Огляд замовлень, залишків інструменту та стану каталогу." />
       <div className="stat-grid">
         <Stat label="Замовлень" value={String(finance?.order_count ?? '—')} icon={<BriefcaseBusiness />} />
         <Stat label="Оборот" value={formatMoney(finance?.revenue ?? 0)} icon={<BadgeDollarSign />} tone="green" />
@@ -656,7 +656,7 @@ function InventoryPanel({
 }) {
   return (
     <>
-      <SectionHeader eyebrow="АСОРТИМЕНТ І ЗАЛИШКИ" title="Товари магазину" description="Оновлюйте постачальників, складські залишки й ціни." />
+      <SectionHeader eyebrow="АСОРТИМЕНТ І ЗАЛИШКИ" title="Каталог інструменту" description="Оновлюйте дані про інструменти, постачальників, залишки й ціни." />
       <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Облік товарів</h2><p>Товар із нульовим залишком автоматично зникає з можливості замовлення.</p></div></div>
         <div className="table-scroll"><table><thead><tr><th>Товар</th><th>Категорія</th><th>Постачальник</th><th>Ціна</th><th>Залишок</th><th /></tr></thead><tbody>{products.map((product) => <tr key={product.sku}><td><strong>{product.name}</strong></td><td>{product.category_name}</td><td><select form={`product-${product.sku}`} name="supplier_id" defaultValue={product.supplier_id || ''}><option value="">Не обрано</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select>{!product.supplier_id && product.supplier && <small className="cell-subtitle">Старий запис: {product.supplier}</small>}</td><td colSpan={3}><form id={`product-${product.sku}`} className="product-edit-row" onSubmit={(event) => { event.preventDefault(); void onSave(new FormData(event.currentTarget), product.sku) }}><label className="visually-hidden">Ціна<input name="price" type="number" min="0" step="0.01" defaultValue={(product.price / 100).toFixed(2)} /></label><span className="unit-label">₴</span><label className="visually-hidden">Залишок<input name="stock" type="number" min="0" max="100000" step="1" defaultValue={product.stock} /></label><span className={`stock-label${product.stock <= 5 ? ' low' : ''}`}>{product.stock} {product.unit}</span><button className="button button-outline compact-button" type="submit" disabled={busy}>Зберегти</button></form></td></tr>)}</tbody></table></div>
       </div>

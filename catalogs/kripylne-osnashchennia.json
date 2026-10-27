@@ -1,0 +1,10 @@
+{
+  "slug": "kripylne-osnashchennia",
+  "name": "Кріплення та оснащення",
+  "emoji": "🧰",
+  "products": [
+    { "sku": "BR-SCREW-WOOD-5X70", "name": "Саморізи по дереву 5×70 мм", "description": "Оцинковане покриття, біта в комплекті, фасування 100 шт.", "price": 12900, "unit": "упак.", "emoji": "🔩", "color": "steel", "stock": 42 },
+    { "sku": "BR-ANCHOR-10X80", "name": "Анкерний болт 10×80 мм", "description": "Оцинкована сталь для надійного монтажу в бетоні та цеглі.", "price": 5900, "unit": "шт.", "emoji": "⚙️", "color": "orange", "stock": 80 },
+    { "sku": "BR-DRILL-BIT-SET", "name": "Набір свердел по металу, 13 шт.", "description": "Швидкорізальна сталь HSS, діаметри від 1,5 до 6,5 мм.", "price": 149900, "unit": "комплект", "emoji": "🪛", "color": "teal", "stock": 9 }
+  ]
+}

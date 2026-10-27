@@ -21,7 +21,7 @@ export function AccountPage() {
   const receiptRef = useRef<HTMLDivElement>(null)
   const printReceipt = useReactToPrint({
     contentRef: receiptRef,
-    documentTitle: selectedReceipt ? `Prometey-order-${selectedReceipt.id}` : 'Prometey-receipt',
+    documentTitle: selectedReceipt ? `Budresurs-order-${selectedReceipt.id}` : 'Budresurs-receipt',
     onPrintError: (_location, reason) => setError(`Не вдалося надрукувати квитанцію: ${reason.message}`),
     pageStyle: '@page { size: A4; margin: 18mm; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }',
   })
@@ -185,7 +185,7 @@ export function AccountPage() {
   if (!customer) {
     const registering = mode === 'register'
     return (
-      <section className="account-page page-width">
+      <section className="account-page account-login-page page-width">
         <div className="account-card">
           <div className="account-mark">♡</div>
           <span className="eyebrow">ВАШ ОСОБИСТИЙ ПРОСТІР</span>
@@ -198,12 +198,12 @@ export function AccountPage() {
           <form className="form-stack" onSubmit={(event) => void submit(event)}>
             {registering && <label>Ваше ім’я<input name="name" autoComplete="name" minLength={2} maxLength={100} required /></label>}
             <label>Електронна пошта<input name="email" type="email" autoComplete="email" maxLength={254} pattern="^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$" title="Введіть адресу у форматі name@example.com" required /></label>
-            {registering && <><label>Номер телефону<input name="phone" type="tel" autoComplete="tel" minLength={9} maxLength={20} placeholder="+380 00 000 00 00" required /></label><label>Ваше місто<select name="city" value={cities.includes(city) ? city : (cities[0] || 'Київ')} onChange={(event) => setCity(event.target.value)} required>{(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}</select></label></>}
+            {registering && <><label>Номер телефону<input name="phone" type="tel" autoComplete="tel" minLength={9} maxLength={20} placeholder="+380 00 000 00 00" required /></label><label>Місто проживання<select name="city" value={cities.includes(city) ? city : (cities[0] || 'Київ')} onChange={(event) => setCity(event.target.value)} required>{(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}</select><small>Збережемо його у вашому профілі для замовлень.</small></label></>}
             <label>Пароль<input name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 12 : undefined} maxLength={registering ? 128 : 256} required />{registering && <small>Щонайменше 12 символів.</small>}</label>
             {error && <p className="form-message" role="alert">{error}</p>}
             <button className="button button-dark button-full" type="submit" disabled={busy}>{busy ? 'Зачекайте…' : registering ? 'Зареєструватися' : 'Увійти до кабінету'}</button>
           </form>
-          <Link className="back-store-link" to="/"><ArrowLeft size={15} /> Повернутися до магазину</Link>
+          <Link className="back-store-link" to="/"><ArrowLeft size={15} /> Повернутися до каталогу</Link>
         </div>
       </section>
     )
@@ -250,14 +250,14 @@ export function AccountPage() {
               <label>Ім’я та прізвище<input name="name" defaultValue={customer.name} minLength={2} maxLength={100} required /></label>
               <label>Електронна пошта<input name="email" type="email" autoComplete="email" defaultValue={customer.email} maxLength={254} pattern="^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$" title="Введіть адресу у форматі name@example.com" required /></label>
               <label>Номер телефону<input name="phone" type="tel" autoComplete="tel" defaultValue={customer.phone} minLength={9} maxLength={20} required /></label>
-              <label>Місто доставки<select name="city" defaultValue={customer.city} required>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label>Місто проживання<select name="city" defaultValue={customer.city} required>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
             </div>
             <button className="button button-dark" type="submit" disabled={busy}>{busy ? 'Зберігаємо…' : 'Зберегти зміни'}</button>
           </form>
         )}
-        <div className="section-heading"><div><span className="eyebrow">ВАШІ ПОКУПКИ</span><h2>Історія замовлень</h2></div><Link className="button button-dark" to="/products">До каталогу</Link></div>
+        <div className="section-heading"><div><span className="eyebrow">ВАШІ ЗАМОВЛЕННЯ</span><h2>Історія замовлень</h2></div><Link className="button button-dark" to="/products">До каталогу</Link></div>
         {orders.length === 0 ? (
-          <div className="empty-state"><ShoppingBag size={34} /><h2>Ваші покупки з’являться тут</h2><p>Оформлюйте замовлення, коли увійшли до кабінету.</p><Link className="button button-dark" to="/products">Обрати продукти</Link></div>
+          <div className="empty-state"><ShoppingBag size={34} /><h2>Ваші замовлення з’являться тут</h2><p>Замовте інструмент із каталогу, щоб відстежувати його тут.</p><Link className="button button-dark" to="/products">Обрати інструмент</Link></div>
         ) : (
           <div className="customer-order-list">{orders.map((order) => (
             <article className="customer-order-card" key={order.id}>
@@ -301,11 +301,11 @@ function Receipt({
         <div className="receipt-toolbar"><strong>Квитанція замовлення</strong><button className="icon-button" type="button" aria-label="Закрити квитанцію" onClick={onClose}><X size={18} /></button></div>
         <div className="receipt-paper" ref={receiptRef}>
           <header className="receipt-heading">
-            <div className="receipt-brand"><span className="brand-mark">п</span><span><strong>прометей</strong><small>магазин добрих продуктів</small></span></div>
+            <div className="receipt-brand"><span className="brand-mark">Б</span><span><strong>БУДРЕСУРС</strong><small>будівельний інструмент та оснащення</small></span></div>
             <span className="receipt-label">КВИТАНЦІЯ ОНЛАЙН-ЗАМОВЛЕННЯ</span>
           </header>
-          <div className="receipt-title-row"><div><span className="eyebrow">ДЯКУЄМО ЗА ПОКУПКУ</span><h1 id="receipt-title">Замовлення №{order.id}</h1></div><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'badge-green'}`}>{order.status}</span></div>
-          <div className="receipt-meta"><span>Дата оформлення<strong>{formatDate(order.created_at)}</strong></span><span>Місто доставки<strong>{order.city}</strong></span></div>
+          <div className="receipt-title-row"><div><span className="eyebrow">КАТАЛОГ «БУДРЕСУРС»</span><h1 id="receipt-title">Замовлення №{order.id}</h1></div><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'badge-green'}`}>{order.status}</span></div>
+          <div className="receipt-meta"><span>Дата оформлення<strong>{formatDate(order.created_at)}</strong></span><span>Місто замовлення<strong>{order.city}</strong></span></div>
           <div className="receipt-customer"><span className="eyebrow">ПОКУПЕЦЬ</span><strong>{order.customer_name || customer.name}</strong><span>{customer.email}</span><span>{order.phone || customer.phone}</span></div>
           <table className="receipt-table"><thead><tr><th>Товар</th><th>Кількість</th><th>Ціна</th><th>Сума</th></tr></thead><tbody>
             {order.items.map((item, index) => <tr key={`${item.product_name}-${index}`}><td>{item.product_name}</td><td>{item.quantity} {item.unit}</td><td>{formatMoney(item.unit_price)}</td><td>{formatMoney(item.line_total)}</td></tr>)}

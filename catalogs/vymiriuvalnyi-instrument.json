@@ -1,0 +1,10 @@
+{
+  "slug": "vymiriuvalnyi-instrument",
+  "name": "Вимірювальний інструмент",
+  "emoji": "📏",
+  "products": [
+    { "sku": "BR-LEVEL-LASER", "name": "Рівень лазерний 2D", "description": "Два зелені промені, точність ±0,3 мм/м, магнітний кронштейн у комплекті.", "price": 1799900, "unit": "шт.", "emoji": "📐", "color": "teal", "stock": 4 },
+    { "sku": "BR-TAPE-5M", "name": "Рулетка будівельна 5 м", "description": "Широка стрічка 25 мм, автоматична фіксація та прогумований корпус.", "price": 24900, "unit": "шт.", "emoji": "📏", "color": "yellow", "stock": 32 },
+    { "sku": "BR-LEVEL-600", "name": "Рівень бульбашковий 600 мм", "description": "Посилений алюмінієвий профіль, дві вимірювальні капсули.", "price": 89900, "unit": "шт.", "emoji": "📏", "color": "steel", "stock": 14 }
+  ]
+}

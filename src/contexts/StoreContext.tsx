@@ -11,8 +11,8 @@ import {
 import { api } from '../api'
 import type { Customer, Product } from '../types'
 
-const CART_KEY = 'prometey-cart'
-const CITY_KEY = 'prometey-city'
+const CART_KEY = 'budresurs-cart'
+const CITY_KEY = 'budresurs-city'
 
 interface StoreValue {
   products: Product[]
@@ -147,7 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (customerId === null) {
       favoritesRef.current = []
       setFavorites([])
-      localStorage.removeItem('prometey-favorites')
+      localStorage.removeItem('budresurs-favorites')
       return () => { active = false }
     }
 

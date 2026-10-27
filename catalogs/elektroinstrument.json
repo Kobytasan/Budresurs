@@ -1,0 +1,11 @@
+{
+  "slug": "elektroinstrument",
+  "name": "Електроінструмент",
+  "emoji": "🔌",
+  "products": [
+    { "sku": "BR-DRILL-18", "name": "Дриль-шурупокрут 18 В", "description": "Акумуляторний, 2 швидкості, патрон 13 мм; акумулятор і зарядний пристрій у комплекті.", "price": 349900, "unit": "шт.", "emoji": "🔩", "color": "teal", "stock": 12 },
+    { "sku": "BR-GRINDER-125", "name": "Кутова шліфмашина 125 мм", "description": "Потужність 900 Вт, плавний пуск і захист від повторного ввімкнення.", "price": 219900, "unit": "шт.", "emoji": "⚙️", "color": "orange", "stock": 8 },
+    { "sku": "BR-SAW-185", "name": "Дискова пилка 185 мм", "description": "Потужність 1400 Вт, глибина пропилу до 65 мм, паралельний упор.", "price": 419900, "unit": "шт.", "emoji": "🪚", "color": "steel", "stock": 5 },
+    { "sku": "BR-PERFORATOR-800", "name": "Перфоратор SDS-plus", "description": "Потужність 800 Вт, три режими роботи та обмежувач глибини.", "price": 289900, "unit": "шт.", "emoji": "🔧", "color": "yellow", "stock": 7 }
+  ]
+}

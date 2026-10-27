@@ -297,6 +297,18 @@ async function initDB() {
       )
     }
   }
+  await pool.query(
+    `UPDATE products SET active = FALSE
+     WHERE category = ANY($1::text[])`,
+    [[
+      'hlib-ta-vypichka',
+      'miaso-ta-ptytsia',
+      'molochni-produkty',
+      'napoi',
+      'ovochi-ta-frukty',
+      'smacholiki',
+    ]],
+  )
   for (const category of categories) {
     await pool.query(
       `UPDATE products
@@ -305,41 +317,6 @@ async function initDB() {
       [category.slug, category.name],
     )
   }
-  const legacyProductReplacements = [
-    {
-      sku: 'MEAT-01',
-      oldName: 'Куряче філе охолоджене',
-      name: 'Фарш яловичий охолоджений',
-      description: 'Свіжий фарш із добірної яловичини.',
-      emoji: '🥩',
-      color: 'rose',
-    },
-    {
-      sku: 'YOG-02',
-      oldName: 'Йогурт натуральний',
-      name: 'Кефір домашній 2,5%',
-      description: 'Ніжний кисломолочний напій щоденного приготування.',
-      emoji: '🥛',
-      color: 'blue',
-    },
-    {
-      sku: 'DRINK-01',
-      oldName: 'Сік яблучний натуральний',
-      name: 'Лимонад домашній',
-      description: 'Освіжаючий лимонад із натурального лимона.',
-      emoji: '🍋',
-      color: 'yellow',
-    },
-  ]
-  for (const product of legacyProductReplacements) {
-    await pool.query(
-      `UPDATE products
-       SET name = $1, description = $2, emoji = $3, color = $4, visual = ''
-       WHERE sku = $5 AND name = $6`,
-      [product.name, product.description, product.emoji, product.color, product.sku, product.oldName],
-    )
-  }
-
   const directorUsername = process.env.PROMETEY_ADMIN_USERNAME || 'director'
   const adminPassword = process.env.PROMETEY_ADMIN_PASSWORD || ''
   const existingDirector = await pool.query('SELECT 1 FROM users WHERE username = $1', [directorUsername])
@@ -349,7 +326,7 @@ async function initDB() {
     }
     await pool.query(
       `INSERT INTO users (username, name, role, password_hash)
-       VALUES ($1, 'Директор магазину', 'director', $2)`,
+       VALUES ($1, 'Директор Будресурс', 'director', $2)`,
       [directorUsername, hashPassword(adminPassword)],
     )
   }
@@ -1178,7 +1155,7 @@ app.use((error, req, res, next) => {
 
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Prometey Node API працює на порту ${PORT}`)
+    console.log(`Будресурс API працює на порту ${PORT}`)
   })
 }).catch((error) => {
   console.error('Не вдалося запустити сервер:', error)

@@ -3,7 +3,6 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   ArrowRight,
   Heart,
-  MapPin,
   PackageCheck,
   ShoppingBag,
   ShoppingCart,
@@ -86,21 +85,6 @@ function CartQuantityInput({
   )
 }
 
-function CityPicker() {
-  const { cities, city, setCity } = useStore()
-  return (
-    <label className="city-picker">
-      <MapPin size={18} aria-hidden="true" />
-      <span>
-        <small>Місто доставки</small>
-        <select value={city} onChange={(event) => setCity(event.target.value)} aria-label="Місто доставки">
-          {(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}
-        </select>
-      </span>
-    </label>
-  )
-}
-
 export function PublicLayout() {
   const { cart, favorites, customer, toast, showToast } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
@@ -119,20 +103,18 @@ export function PublicLayout() {
 
   return (
     <div className="storefront">
-      <div className="announcement">Добрі продукти для вашого столу · свіже щодня</div>
       <header className="store-header">
-        <Link className="brand" to="/" aria-label="Прометей — на головну">
-          <span className="brand-mark">п</span>
-          <span><strong>прометей</strong><small>магазин добрих продуктів</small></span>
+        <Link className="brand" to="/" aria-label="Будресурс — на головну">
+          <span className="brand-mark">Б</span>
+          <span><strong>БУДРЕСУРС</strong><small>інструмент для будівництва</small></span>
         </Link>
         <nav className="store-nav" aria-label="Головна навігація">
           <NavLink to="/" end>Головна</NavLink>
           <NavLink to="/products">Каталог</NavLink>
-          <NavLink to="/about">Про компанію</NavLink>
-          <NavLink to="/support">Підтримка</NavLink>
+          <NavLink to="/about">Про нас</NavLink>
+          <NavLink to="/support">Контакти</NavLink>
         </nav>
         <div className="store-actions">
-          <CityPicker />
           <Link
             className="icon-link favorite-link"
             to={customer ? '/products#favorites' : '/account'}
@@ -165,11 +147,11 @@ export function PublicLayout() {
       <main><Outlet /></main>
       <footer className="store-footer">
         <Link className="brand footer-brand" to="/">
-          <span className="brand-mark">п</span>
-          <span><strong>прометей</strong><small>магазин добрих продуктів</small></span>
+          <span className="brand-mark">Б</span>
+          <span><strong>БУДРЕСУРС</strong><small>інструмент для будівництва</small></span>
         </Link>
-        <p>Хороші продукти. Хороші люди. Хороший день.</p>
-        <div><Link to="/products">Каталог</Link><Link to="/about">Про нас</Link><Link to="/support">Підтримка</Link><Link to="/admin">Кабінет команди</Link></div>
+        <p>Надійний інструмент для точного результату.</p>
+        <div><Link to="/products">Каталог</Link><Link to="/about">Про нас</Link><Link to="/support">Контакти</Link><Link to="/admin">Кабінет команди</Link></div>
       </footer>
       {cartOpen && <CartDrawer onClose={() => setCartOpen(false)} />}
       <div className={`toast${toast ? ' visible' : ''}`} role="status" aria-live="polite">{toast}</div>
@@ -234,12 +216,12 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
       <button className="drawer-backdrop" type="button" aria-label="Закрити кошик" onClick={onClose} />
       <aside className="cart-drawer" aria-label="Ваш кошик">
         <div className="drawer-heading">
-          <div><span className="eyebrow">ВАША ПОКУПКА</span><h2>Кошик <small>({entries.reduce((n, item) => n + item.quantity, 0)})</small></h2></div>
+          <div><span className="eyebrow">ВАШЕ ЗАМОВЛЕННЯ</span><h2>Кошик <small>({entries.reduce((n, item) => n + item.quantity, 0)})</small></h2></div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Закрити"><X /></button>
         </div>
         {success && <div className="notice notice-success"><PackageCheck size={18} />{success}</div>}
         {entries.length === 0 ? (
-          <div className="empty-state"><ShoppingBag size={34} /><h3>Кошик поки порожній</h3><p>Додайте щось смачненьке — і ми все підготуємо.</p></div>
+          <div className="empty-state"><ShoppingBag size={34} /><h3>Кошик поки порожній</h3><p>Оберіть потрібний інструмент у каталозі.</p></div>
         ) : (
           <>
             <div className="cart-list">
@@ -263,7 +245,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
               ))}
             </div>
             <div className="cart-total"><span>Разом</span><strong>{formatMoney(total)}</strong></div>
-            <p className="delivery-hint">{total >= 50000 ? 'Безкоштовна доставка для замовлення!' : `Ще ${formatMoney(50000 - total)} до безкоштовної доставки.`}</p>
+            <p className="delivery-hint">Умови та вартість отримання замовлення узгоджуються окремо.</p>
             {hasUnavailableQuantity && <p className="stock-shortage" role="alert">Змініть кількість товарів відповідно до актуальної наявності, щоб оформити замовлення.</p>}
             {!checkoutOpen ? (
               <button className="button button-dark button-full" type="button" disabled={hasUnavailableQuantity} onClick={() => { setCheckoutOpen(true); setSuccess('') }}>
@@ -274,8 +256,8 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
                 <h3>Дані доставки</h3>
                 <label>Ваше ім’я<input name="name" defaultValue={customer?.name || ''} minLength={2} maxLength={100} required /></label>
                 <label>Телефон<input name="phone" type="tel" defaultValue={customer?.phone || ''} minLength={9} maxLength={20} required /></label>
-                <label>Місто<select name="city" defaultValue={customer?.city || city} required>{(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}</select></label>
-                <label>Адреса доставки<textarea name="address" minLength={5} maxLength={200} required /></label>
+                <label>Місто отримання<select name="city" defaultValue={customer?.city || city} required>{(cities.length ? cities : ['Київ']).map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label>Адреса отримання<textarea name="address" minLength={5} maxLength={200} required /></label>
                 {error && <p className="form-message" role="alert">{error}</p>}
                 <button className="button button-dark button-full" type="submit" disabled={submitting || hasUnavailableQuantity}>
                   {submitting ? 'Надсилаємо…' : `Підтвердити · ${formatMoney(total)}`}
@@ -292,26 +274,7 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
 export function ProductArt({ product, compact = false }: { product: Product; compact?: boolean }) {
   return (
     <div className={`product-art-box ${product.color}${compact ? ' compact' : ''}`}>
-      {product.visual === 'milk-churn' ? (
-        <svg className="product-art-svg" viewBox="0 0 120 120" aria-hidden="true">
-          <path d="M43 31v-8c0-5 4-8 17-8s17 3 17 8v8" fill="none" stroke="#84949a" strokeWidth="4" strokeLinecap="round" />
-          <path d="M50 25h20l5 11c9 6 13 15 13 24v31c0 8-5 13-13 13H45c-8 0-13-5-13-13V60c0-9 4-18 13-24z" fill="#d8e2e4" stroke="#87979c" strokeWidth="2.5" />
-          <path d="M40 49h40M35 87h50" stroke="#f9fbf9" strokeWidth="3" opacity=".85" />
-          <path d="M43 55h34v23H43z" rx="4" fill="#fffdf7" stroke="#c1caca" />
-          <path d="M46 61h28v5H46z" rx="2" fill="#54815f" />
-          <text x="60" y="65" fill="white" fontSize="4.2" fontFamily="Arial,sans-serif" fontWeight="700" textAnchor="middle">ФЕРМЕРСЬКЕ</text>
-          <text x="60" y="73" fill="#496149" fontSize="7" fontFamily="Arial,sans-serif" fontWeight="700" textAnchor="middle">МОЛОКО</text>
-        </svg>
-      ) : product.visual === 'yogurt-cup' ? (
-        <svg className="product-art-svg" viewBox="0 0 120 120" aria-hidden="true">
-          <ellipse cx="60" cy="29" rx="30" ry="8" fill="#f7f5f0" stroke="#d9d4d2" strokeWidth="2" />
-          <path d="M32 31h56l-7 60c-.7 6-5 10-11 10H50c-6 0-10.3-4-11-10z" fill="#fffdfb" stroke="#d9d4d2" strokeWidth="2" />
-          <path d="M36 57h48l-4 34c-.7 5-4 8-9 8H51c-5 0-8-3-9-8z" fill="#f5dfe7" />
-          <path d="M43 63h34v17H43z" rx="4" fill="#54815f" />
-          <text x="60" y="70" fill="white" fontSize="5" fontFamily="Arial,sans-serif" fontWeight="700" textAnchor="middle">ЙОГУРТ</text>
-          <text x="60" y="76" fill="white" fontSize="3.5" fontFamily="Arial,sans-serif" textAnchor="middle">НАТУРАЛЬНИЙ</text>
-        </svg>
-      ) : <span className="product-emoji" aria-hidden="true">{product.emoji}</span>}
+      <span className="product-emoji" aria-hidden="true">{product.emoji}</span>
     </div>
   )
 }

@@ -226,41 +226,48 @@ def init_db():
                    WHERE suppliers.name = products.supplier COLLATE NOCASE
                ) WHERE supplier_id IS NULL AND trim(supplier) != ''"""
         )
-        db.execute(
-            "UPDATE products SET visual = 'milk-churn' WHERE sku = 'moloko-fermerske' "
-            "AND visual = ''"
+        legacy_categories = (
+            "hlib-ta-vypichka",
+            "miaso-ta-ptytsia",
+            "molochni-produkty",
+            "napoi",
+            "ovochi-ta-frukty",
+            "smacholiki",
+        )
+        db.executemany(
+            "UPDATE products SET active = 0 WHERE category = ?",
+            ((category,) for category in legacy_categories),
         )
         db.execute(
-            "UPDATE products SET visual = 'yogurt-cup' WHERE sku = 'yohurt-naturalnyi' "
-            "AND visual = ''"
+            "UPDATE users SET name = 'Директор Будресурс' "
+            "WHERE username = 'director' AND name = 'Директор магазину'"
         )
-        if db.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
-            for catalog_path in sorted(CATALOG_DIR.glob("*.json")):
-                catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-                for product in catalog["products"]:
-                    db.execute(
-                        """INSERT INTO products
-                        (sku, name, description, price, category, category_name,
-                         unit, emoji, color, visual, supplier, stock)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            product["sku"],
-                            product["name"],
-                            product["description"],
-                            product["price"],
-                            catalog["slug"],
-                            catalog["name"],
-                            product["unit"],
-                            product["emoji"],
-                            product["color"],
-                            product.get("visual", ""),
-                            product.get("supplier", ""),
-                            product["stock"],
-                        ),
-                    )
+        for catalog_path in sorted(CATALOG_DIR.glob("*.json")):
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+            for product in catalog["products"]:
+                db.execute(
+                    """INSERT OR IGNORE INTO products
+                    (sku, name, description, price, category, category_name,
+                     unit, emoji, color, visual, supplier, stock)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        product["sku"],
+                        product["name"],
+                        product["description"],
+                        product["price"],
+                        catalog["slug"],
+                        catalog["name"],
+                        product["unit"],
+                        product["emoji"],
+                        product["color"],
+                        product.get("visual", ""),
+                        product.get("supplier", ""),
+                        product["stock"],
+                    ),
+                )
 
         director_password = os.environ.get(
-            "PROMETEY_ADMIN_PASSWORD", "PrometeyDemo2026!"
+            "PROMETEY_ADMIN_PASSWORD", "BudresursDemo2026!"
         )
         if not db.execute(
             "SELECT 1 FROM users WHERE username = 'director'"
@@ -314,7 +321,7 @@ def user_payload(row):
 
 
 class StoreHandler(BaseHTTPRequestHandler):
-    server_version = "PrometeyStore/1.0"
+    server_version = "BudresursCatalog/1.0"
 
     def log_message(self, format_string, *args):
         print(f"{self.log_date_time_string()} {format_string % args}")
@@ -1354,7 +1361,7 @@ if __name__ == "__main__":
             "щонайменше 12 символів перед створенням бази."
         )
     init_db()
-    StoreHandler.server_version = "PrometeyStore/1.0"
+    StoreHandler.server_version = "BudresursCatalog/1.0"
     demo_available = host.lower() in {"127.0.0.1", "localhost", "::1"}
     if DEMO_MODE_ENABLED and not demo_available:
         print(
@@ -1364,5 +1371,5 @@ if __name__ == "__main__":
         )
     httpd = ThreadingHTTPServer((host, port), StoreHandler)
     httpd.demo_mode_available = demo_available
-    print(f"Prometey працює: http://{host}:{port}")
+    print(f"Будресурс працює: http://{host}:{port}")
     httpd.serve_forever()
