@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   CircleHelp,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -17,6 +18,7 @@ import {
   Store,
   Trash2,
   Users,
+  UserRound,
   X,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -33,7 +35,7 @@ import type {
   SupportMessage,
 } from '../types'
 
-type TabId = 'overview' | 'finance' | 'inventory' | 'team' | 'history' | 'suppliers' | 'support'
+type TabId = 'overview' | 'finance' | 'inventory' | 'team' | 'history' | 'suppliers' | 'support' | 'profile'
 interface Tab { id: TabId; label: string; icon: typeof LayoutDashboard }
 interface Overview {
   financials: { order_count: number; revenue: number; paid: number; due: number }
@@ -57,14 +59,17 @@ const tabsByRole: Record<StaffRole, Tab[]> = {
     { id: 'history', label: 'Історія статусів', icon: CalendarClock },
     { id: 'suppliers', label: 'Постачальники', icon: Package },
     { id: 'support', label: 'Підтримка', icon: CircleHelp },
+    { id: 'profile', label: 'Мій профіль', icon: UserRound },
   ],
   accountant: [
     { id: 'overview', label: 'Огляд фінансів', icon: LayoutDashboard },
     { id: 'finance', label: 'Фінансовий журнал', icon: BadgeDollarSign },
+    { id: 'profile', label: 'Мій профіль', icon: UserRound },
   ],
   inventory: [
     { id: 'overview', label: 'Огляд складу', icon: LayoutDashboard },
     { id: 'inventory', label: 'Товари та склад', icon: Boxes },
+    { id: 'profile', label: 'Мій профіль', icon: UserRound },
   ],
 }
 
@@ -257,6 +262,55 @@ export function StaffPage() {
     }
   }
 
+  async function saveOwnProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const values = new FormData(event.currentTarget)
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await api<{ user: StaffUser }>('/api/auth/profile', {
+        method: 'PATCH',
+        body: jsonBody({ name: values.get('name'), username: values.get('username') }),
+      })
+      setUser(result.user)
+      setNotice('Особисті дані оновлено.')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не вдалося оновити профіль.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function changeOwnPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const values = new FormData(form)
+    const newPassword = String(values.get('new_password') || '')
+    if (newPassword !== values.get('confirm_password')) {
+      setError('Новий пароль і підтвердження не збігаються.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      await api('/api/auth/password', {
+        method: 'PATCH',
+        body: jsonBody({
+          current_password: values.get('current_password'),
+          new_password: newPassword,
+        }),
+      })
+      form.reset()
+      setNotice('Пароль змінено. Інші активні сеанси завершено.')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не вдалося змінити пароль.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function changeOrder(order: AdminOrder, field: 'status' | 'payment_status', value: string) {
     setBusy(true)
     setError('')
@@ -398,7 +452,10 @@ export function StaffPage() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-user"><span className="avatar">{user.name.slice(0, 1).toLocaleUpperCase('uk')}</span><span><strong>{user.name}</strong><small>{roleNames[user.role]}</small></span></div>
+        <button className="sidebar-user" type="button" onClick={() => { setActiveTab('profile'); setMobileMenu(false); setError(''); setNotice('') }} aria-label="Відкрити мій профіль">
+          <span className="avatar">{user.name.trim().slice(0, 1).toLocaleUpperCase('uk')}</span>
+          <span><strong>{user.name}</strong><small>{roleNames[user.role]}</small></span>
+        </button>
         <button className="sidebar-logout" type="button" onClick={() => void signOut()} disabled={busy}><LogOut size={16} />Вийти</button>
       </aside>
       {mobileMenu && <button className="admin-mobile-backdrop" type="button" aria-label="Закрити меню" onClick={() => setMobileMenu(false)} />}
@@ -422,9 +479,41 @@ export function StaffPage() {
           {activeTab === 'history' && user.role === 'director' && <HistoryPanel history={history} />}
           {activeTab === 'suppliers' && user.role === 'director' && <SuppliersPanel suppliers={suppliers} busy={busy} onCreate={createSupplier} />}
           {activeTab === 'support' && user.role === 'director' && <SupportPanel messages={messages} busy={busy} onUpdate={updateSupport} />}
+          {activeTab === 'profile' && <StaffProfilePanel key={`${user.id}-${user.username}-${user.name}`} user={user} busy={busy} onSaveProfile={saveOwnProfile} onChangePassword={changeOwnPassword} />}
         </main>
       </div>
     </div>
+  )
+}
+
+function StaffProfilePanel({
+  user, busy, onSaveProfile, onChangePassword,
+}: {
+  user: StaffUser
+  busy: boolean
+  onSaveProfile: (event: FormEvent<HTMLFormElement>) => void
+  onChangePassword: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  return (
+    <>
+      <SectionHeader eyebrow="ОСОБИСТИЙ ПРОФІЛЬ" title="Ваші дані" description="Оновіть ім’я та логін. Для зміни пароля підтвердіть поточний." />
+      <div className="staff-profile-grid">
+        <form className="panel-card staff-profile-form" onSubmit={onSaveProfile}>
+          <div className="panel-heading"><div><h2>Особиста інформація</h2><p>Ці дані бачите ви та директор у списку команди.</p></div><UserRound size={20} /></div>
+          <label>Ім’я та прізвище<input name="name" defaultValue={user.name} minLength={2} maxLength={100} required /></label>
+          <label>Логін<input name="username" defaultValue={user.username} minLength={3} maxLength={32} pattern="[A-Za-z0-9_.-]{3,32}" autoComplete="username" required /></label>
+          <label>Посада<input value={user.role_label} readOnly /></label>
+          <button className="button button-dark" type="submit" disabled={busy}>Зберегти дані</button>
+        </form>
+        <form className="panel-card staff-profile-form" onSubmit={onChangePassword}>
+          <div className="panel-heading"><div><h2>Зміна пароля</h2><p>Новий пароль має містити щонайменше 12 символів.</p></div><KeyRound size={20} /></div>
+          <label>Поточний пароль<input name="current_password" type="password" autoComplete="current-password" maxLength={256} required /></label>
+          <label>Новий пароль<input name="new_password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
+          <label>Підтвердьте новий пароль<input name="confirm_password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
+          <button className="button button-dark" type="submit" disabled={busy}>Змінити пароль</button>
+        </form>
+      </div>
+    </>
   )
 }
 

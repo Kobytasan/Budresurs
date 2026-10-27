@@ -56,6 +56,10 @@ h1, h2, h3, p { margin-top: 0; }
 .icon-link:hover { color: var(--accent); }
 .favorite-link { position: relative; }
 .favorite-link b, .cart-trigger b { display: grid; min-width: 19px; height: 19px; place-items: center; border-radius: 20px; background: #f0d6a8; color: var(--dark); font-size: 10px; }
+.customer-account-link { max-width: 180px; }
+.customer-account-link > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.customer-avatar { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; overflow: hidden; border: 1px solid #e8dfd1; border-radius: 50%; background: #f5eadb; color: #71451d; font-size: 13px; font-weight: 700; }
+.customer-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .button { min-height: 43px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 0 17px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; transition: transform .18s ease, background .18s ease, box-shadow .18s ease; }
 .button:hover:not(:disabled) { transform: translateY(-1px); }
 .button-dark { background: var(--dark); color: #fff9ed; }
@@ -314,7 +318,9 @@ h1, h2, h3, p { margin-top: 0; }
 .admin-sidebar nav button:hover, .sidebar-logout:hover { background: rgb(255 255 255 / 8%); color: white; }
 .admin-sidebar nav button.active { background: rgb(255 255 255 / 13%); color: #fff5e5; box-shadow: inset 3px 0 #e8a838; }
 .admin-sidebar nav button.active svg { color: #e8a838; }
-.sidebar-user { display: flex; align-items: center; gap: 10px; padding: 13px 5px; margin-top: auto; border-top: 1px solid rgb(255 255 255 / 10%); }
+.sidebar-user { display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 5px; margin-top: auto; border: 0; border-top: 1px solid rgb(255 255 255 / 10%); background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.sidebar-user:hover > span:last-child strong { color: #f4c778; }
+.sidebar-user:focus-visible { outline: 2px solid #e8a838; outline-offset: 3px; }
 .sidebar-user > span:last-child { display: grid; gap: 4px; min-width: 0; }
 .sidebar-user strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-user small { color: rgb(255 255 255 / 50%); font-size: 9px; }
@@ -393,6 +399,11 @@ h1, h2, h3, p { margin-top: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .admin-two-column { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(270px, .8fr); align-items: start; gap: 15px; }
 .admin-two-column > .panel-card.form-stack { padding: 19px; }
+.staff-profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 15px; }
+.staff-profile-form { display: grid; gap: 13px; }
+.staff-profile-form label { display: grid; gap: 7px; color: #51493d; font-size: 10px; font-weight: 700; }
+.staff-profile-form input { width: 100%; min-height: 39px; padding: 9px 11px; border: 1px solid #e3ddd2; border-radius: 7px; background: #fffdfa; color: #302a22; font-size: 11px; }
+.staff-profile-form input:read-only { background: #f5f2ec; color: #70695e; }
 .history-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .history-summary .stat-card { min-width: 0; }
 .history-summary .stat-card > strong { font-size: 16px; }
@@ -427,7 +438,10 @@ h1, h2, h3, p { margin-top: 0; }
   .store-nav a { font-size: 10px; }
   .store-actions { margin-left: auto; }
   .store-actions .city-picker { display: none; }
-  .store-actions .icon-link span, .store-actions .icon-link:not(.favorite-link) { display: none; }
+  .store-actions .icon-link span, .store-actions .icon-link:not(.favorite-link):not(.customer-account-link) { display: none; }
+  .store-actions .customer-account-link { max-width: none; }
+  .store-actions .customer-account-link > span:last-child { display: none; }
+  .store-actions .customer-avatar { display: grid; }
   .favorite-link { gap: 0; }
   .cart-trigger { min-height: 34px; padding: 0 8px; gap: 5px; font-size: 9px; }
   .hero { grid-template-columns: 1fr; min-height: unset; padding: 55px 25px 20px; }
@@ -506,6 +520,7 @@ h1, h2, h3, p { margin-top: 0; }
   .stat-card > strong { font-size: 14px; }
   .stat-icon { width: 31px; height: 31px; }
   .admin-two-column { gap: 12px; }
+  .staff-profile-grid { grid-template-columns: 1fr; }
   .history-summary { grid-template-columns: 1fr; }
   .order-customer-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .receipt-overlay { padding: 8px; }

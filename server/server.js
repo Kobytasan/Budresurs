@@ -23,6 +23,12 @@ const DELIVERY_CITIES = ['Київ', 'Львів', 'Одеса', 'Дніпро',
 const ROLE_LABELS = { director: 'Директор', accountant: 'Бухгалтер', inventory: 'Працівник складу' }
 const WORK_STATUSES = ['На роботі', 'Вихідний', 'У відпустці', 'Кінець робочого дня']
 
+function localDemoEnabled(req) {
+  return process.env.PROMETEY_DEMO_MODE === '1'
+    && !process.env.RENDER
+    && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip)
+}
+
 app.set('trust proxy', 1)
 app.use(express.json({ limit: '32kb' }))
 
@@ -347,6 +353,19 @@ async function initDB() {
       [directorUsername, hashPassword(adminPassword)],
     )
   }
+  if (process.env.PROMETEY_DEMO_MODE === '1' && !process.env.RENDER) {
+    const demoEmployees = [
+      { username: 'olena.kovalenko', name: 'Олена Коваленко', role: 'accountant' },
+      { username: 'andrii.melnyk', name: 'Андрій Мельник', role: 'inventory' },
+    ]
+    for (const employee of demoEmployees) {
+      await pool.query(
+        `INSERT INTO users (username, name, role, password_hash)
+         VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING`,
+        [employee.username, employee.name, employee.role, hashPassword(crypto.randomBytes(32).toString('base64url'))],
+      )
+    }
+  }
   await pool.query(
     `INSERT INTO work_status_history (user_id, employee_name, employee_username, status, changed_at)
      SELECT u.id, u.name, u.username, u.work_status, NOW() FROM users u
@@ -417,6 +436,52 @@ app.get('/api/auth/me', async (req, res, next) => {
   } catch (error) { next(error) }
 })
 
+app.patch('/api/auth/profile', async (req, res, next) => {
+  try {
+    const user = await requireUser(req, res)
+    if (!user) return
+    const payload = req.body || {}
+    if (Object.keys(payload).length !== 2 || Object.keys(payload).some((key) => !['name', 'username'].includes(key))) {
+      return apiError(res, 400, 'Перевірте ім’я та логін.')
+    }
+    const name = text(payload.name, 100)
+    const username = text(payload.username, 32)
+    if (name.length < 2 || !/^[A-Za-z0-9_.-]{3,32}$/.test(username)) {
+      return apiError(res, 400, 'Вкажіть ім’я та логін із 3–32 латинських літер, цифр або . _ -.')
+    }
+    const result = await pool.query(
+      `UPDATE users SET name = $1, username = $2
+       WHERE id = $3 RETURNING id, username, name, role, work_status`,
+      [name, username, user.id],
+    )
+    res.json({ user: userPayload(result.rows[0]) })
+  } catch (error) {
+    if (error.code === '23505') return apiError(res, 409, "Такий логін уже використовується.")
+    next(error)
+  }
+})
+
+app.patch('/api/auth/password', async (req, res, next) => {
+  try {
+    const user = await requireUser(req, res)
+    if (!user) return
+    const { current_password: currentPassword, new_password: newPassword } = req.body || {}
+    if (Object.keys(req.body || {}).length !== 2
+      || typeof currentPassword !== 'string' || currentPassword.length > 256
+      || typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
+      return apiError(res, 400, 'Новий пароль має містити від 12 до 128 символів.')
+    }
+    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [user.id])
+    if (!verifyPassword(currentPassword, result.rows[0]?.password_hash)) {
+      return apiError(res, 400, 'Поточний пароль введено неправильно.')
+    }
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashPassword(newPassword), user.id])
+    const token = getCookie(req, 'prometey_session')
+    await pool.query('DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2', [user.id, tokenHash(token)])
+    res.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
 app.post('/api/auth/login', async (req, res, next) => {
   try {
     const username = text(req.body?.username, 64)
@@ -445,9 +510,7 @@ app.post('/api/auth/logout', async (req, res, next) => {
 
 app.get('/api/demo/staff', async (req, res, next) => {
   try {
-    const enabled = process.env.PROMETEY_DEMO_MODE === '1'
-      && !process.env.RENDER
-      && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip)
+    const enabled = localDemoEnabled(req)
     if (!enabled) return res.json({ enabled: false, staff: [] })
     const { rows } = await pool.query(
       'SELECT id, username, name, role, work_status, active FROM users ORDER BY active DESC, id',
@@ -458,9 +521,7 @@ app.get('/api/demo/staff', async (req, res, next) => {
 
 app.post('/api/demo/login', async (req, res, next) => {
   try {
-    const enabled = process.env.PROMETEY_DEMO_MODE === '1'
-      && !process.env.RENDER
-      && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip)
+    const enabled = localDemoEnabled(req)
     if (!enabled) return apiError(res, 404, 'Деморежим швидкого входу вимкнений.')
     const userId = Number(req.body?.user_id)
     if (!Number.isInteger(userId)) return apiError(res, 400, 'Оберіть працівника зі списку.')

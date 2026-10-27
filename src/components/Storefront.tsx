@@ -102,9 +102,10 @@ function CityPicker() {
 }
 
 export function PublicLayout() {
-  const { cart, favorites, customer, toast } = useStore()
+  const { cart, favorites, customer, toast, showToast } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0)
 
   useEffect(() => {
@@ -132,12 +133,30 @@ export function PublicLayout() {
         </nav>
         <div className="store-actions">
           <CityPicker />
-          <Link className="icon-link favorite-link" to={customer ? '/products#favorites' : '/account'} aria-label={customer ? `Улюблене у вашому кабінеті, ${favorites.length}` : 'Увійти, щоб переглянути улюблене'}>
+          <Link
+            className="icon-link favorite-link"
+            to={customer ? '/products#favorites' : '/account'}
+            aria-label={customer ? `Улюблене у вашому кабінеті, ${favorites.length}` : 'Увійти, щоб переглянути улюблене'}
+            onClick={(event) => {
+              if (!customer) {
+                event.preventDefault()
+                showToast('Щоб переглядати улюблене, увійдіть або зареєструйтеся.')
+                navigate('/account')
+              }
+            }}
+          >
             <Heart size={19} />
             <span>Обране</span>
             {favorites.length > 0 && <b>{favorites.length}</b>}
           </Link>
-          <Link className="icon-link" to="/account"><span>Мій кабінет</span></Link>
+          <Link className="icon-link customer-account-link" to="/account" aria-label={customer ? `Кабінет покупця: ${customer.name}` : 'Увійти або зареєструватися'}>
+            {customer && <span className="customer-avatar" aria-hidden="true">
+              {customer.avatar_url
+                ? <img src={customer.avatar_url} alt="" />
+                : customer.name.trim().slice(0, 1).toLocaleUpperCase('uk')}
+            </span>}
+            <span>{customer?.name || 'Мій кабінет'}</span>
+          </Link>
           <button className="button button-dark cart-trigger" type="button" onClick={() => setCartOpen(true)}>
             <ShoppingCart size={17} /> Кошик <b>{cartCount}</b>
           </button>
