@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, LogOut, Printer, ReceiptText, ShoppingBag, XCircle } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { useReactToPrint } from 'react-to-print'
+import { ArrowLeft, Camera, LogOut, Pencil, Printer, ReceiptText, ShoppingBag, X, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api, jsonBody } from '../api'
 import { formatDate, formatMoney } from '../components/Storefront'
@@ -13,8 +14,17 @@ export function AccountPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [orders, setOrders] = useState<CustomerOrder[]>([])
   const [selectedReceipt, setSelectedReceipt] = useState<CustomerOrder | null>(null)
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [avatarDraft, setAvatarDraft] = useState<string | null | undefined>(undefined)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const receiptRef = useRef<HTMLDivElement>(null)
+  const printReceipt = useReactToPrint({
+    contentRef: receiptRef,
+    documentTitle: selectedReceipt ? `Prometey-order-${selectedReceipt.id}` : 'Prometey-receipt',
+    onPrintError: (_location, reason) => setError(`Не вдалося надрукувати квитанцію: ${reason.message}`),
+    pageStyle: '@page { size: A4; margin: 18mm; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }',
+  })
 
   const loadOrders = async () => {
     const result = await api<{ orders: CustomerOrder[] }>('/api/customer/orders')
@@ -84,12 +94,73 @@ export function AccountPage() {
       setCustomer(null)
       setOrders([])
       setSelectedReceipt(null)
+      setProfileEditing(false)
+      setAvatarDraft(undefined)
       setMode('login')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не вдалося вийти з кабінету.')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!customer) return
+    const values = new FormData(event.currentTarget)
+    setBusy(true)
+    setError('')
+    try {
+      const { customer: updated } = await api<{ customer: Customer }>('/api/customer/profile', {
+        method: 'PATCH',
+        body: jsonBody({
+          name: values.get('name'),
+          email: values.get('email'),
+          phone: values.get('phone'),
+          city: values.get('city'),
+        }),
+      })
+      setCustomer(updated)
+      setCity(updated.city)
+      if (avatarDraft !== undefined) {
+        if (avatarDraft === null) {
+          await api('/api/customer/avatar', { method: 'DELETE' })
+          setCustomer({ ...updated, avatar_url: null })
+        } else {
+          const result = await api<{ avatar_url: string }>('/api/customer/avatar', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'text/plain' },
+            body: avatarDraft,
+          })
+          setCustomer({ ...updated, avatar_url: result.avatar_url })
+        }
+      }
+      setAvatarDraft(undefined)
+      setProfileEditing(false)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не вдалося зберегти профіль.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function chooseAvatar(file?: File) {
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 1024 * 1024) {
+      setError('Оберіть фото PNG, JPG або WebP розміром до 1 МБ.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAvatarDraft(reader.result)
+        setError('')
+      } else {
+        setError('Не вдалося прочитати файл зображення.')
+      }
+    }
+    reader.onerror = () => setError('Не вдалося прочитати файл зображення.')
+    reader.readAsDataURL(file)
   }
 
   async function cancelOrder(order: CustomerOrder) {
@@ -142,21 +213,59 @@ export function AccountPage() {
     <section className="account-page page-width">
       <div className="account-dashboard">
         <div className="account-dashboard-heading">
-          <div><span className="eyebrow">ВАШ ОСОБИСТИЙ ПРОСТІР</span><h1>Вітаємо, {customer.name}</h1><p>{customer.email} · {customer.phone} · {customer.city}</p></div>
-          <button className="button button-outline" type="button" disabled={busy} onClick={() => void logout()}><LogOut size={16} /> Вийти</button>
+          <div className="account-profile-heading">
+            <div className="account-avatar">{customer.avatar_url
+              ? <img src={customer.avatar_url} alt={`Аватар ${customer.name}`} />
+              : <span>{customer.name.slice(0, 1).toLocaleUpperCase('uk')}</span>}</div>
+            <div><span className="eyebrow">ВАШ ОСОБИСТИЙ ПРОСТІР</span><h1>Вітаємо, {customer.name}</h1><p>{customer.email} · {customer.phone} · {customer.city}</p></div>
+          </div>
+          <div className="account-header-actions">
+            <button className="button button-outline" type="button" disabled={busy} onClick={() => { setProfileEditing((value) => !value); setAvatarDraft(undefined); setError('') }}>
+              {profileEditing ? <X size={16} /> : <Pencil size={16} />}{profileEditing ? 'Скасувати редагування' : 'Редагувати профіль'}
+            </button>
+            <button className="button button-outline" type="button" disabled={busy} onClick={() => void logout()}><LogOut size={16} /> Вийти</button>
+          </div>
         </div>
         {error && <div className="notice notice-error" role="alert">{error}</div>}
+        {profileEditing && (
+          <form className="account-profile-form" onSubmit={(event) => void saveProfile(event)}>
+            <h2>Особисті дані</h2>
+            <div className="account-avatar-editor">
+              <div className="account-avatar account-avatar-large">
+                {(avatarDraft === undefined ? customer.avatar_url : avatarDraft)
+                  ? <img src={avatarDraft === undefined ? customer.avatar_url || '' : avatarDraft || ''} alt="Попередній перегляд аватара" />
+                  : <span>{customer.name.slice(0, 1).toLocaleUpperCase('uk')}</span>}
+              </div>
+              <div className="account-avatar-actions">
+                <label className="button button-outline avatar-upload-button"><Camera size={16} /> Змінити аватар
+                  <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(event) => chooseAvatar(event.currentTarget.files?.[0])} />
+                </label>
+                {(avatarDraft === undefined ? Boolean(customer.avatar_url) : avatarDraft !== null) && (
+                  <button className="text-button" type="button" onClick={() => setAvatarDraft(null)}>Видалити фото</button>
+                )}
+                <small>PNG, JPG або WebP, до 1 МБ.</small>
+              </div>
+            </div>
+            <div className="account-profile-fields">
+              <label>Ім’я та прізвище<input name="name" defaultValue={customer.name} minLength={2} maxLength={100} required /></label>
+              <label>Електронна пошта<input name="email" type="email" autoComplete="email" defaultValue={customer.email} maxLength={254} pattern="^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$" title="Введіть адресу у форматі name@example.com" required /></label>
+              <label>Номер телефону<input name="phone" type="tel" autoComplete="tel" defaultValue={customer.phone} minLength={9} maxLength={20} required /></label>
+              <label>Місто доставки<select name="city" defaultValue={customer.city} required>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
+            </div>
+            <button className="button button-dark" type="submit" disabled={busy}>{busy ? 'Зберігаємо…' : 'Зберегти зміни'}</button>
+          </form>
+        )}
         <div className="section-heading"><div><span className="eyebrow">ВАШІ ПОКУПКИ</span><h2>Історія замовлень</h2></div><Link className="button button-dark" to="/products">До каталогу</Link></div>
         {orders.length === 0 ? (
           <div className="empty-state"><ShoppingBag size={34} /><h2>Ваші покупки з’являться тут</h2><p>Оформлюйте замовлення, коли увійшли до кабінету.</p><Link className="button button-dark" to="/products">Обрати продукти</Link></div>
         ) : (
           <div className="customer-order-list">{orders.map((order) => (
             <article className="customer-order-card" key={order.id}>
-              <div className="order-card-header"><div><span className="eyebrow">ЗАМОВЛЕННЯ №{order.id}</span><p>{formatDate(order.created_at)} · {order.city}</p></div><span className={`badge ${order.payment_status === 'Оплачено' ? 'badge-green' : 'badge-muted'}`}>{order.payment_status}</span></div>
+              <div className="order-card-header"><div><span className="eyebrow">ЗАМОВЛЕННЯ №{order.id}</span><p>{formatDate(order.created_at)} · {order.city}</p></div><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : order.payment_status === 'Оплачено' ? 'badge-green' : 'badge-muted'}`}>{order.status === 'Скасовано' ? 'Не оплачено · скасовано' : order.payment_status}</span></div>
               <div className="order-status-line"><span>Статус замовлення</span><strong>{order.status}</strong></div>
               <div className="order-items">{order.items.map((item, index) => <div key={`${item.product_name}-${index}`}><span>{item.product_name} · {item.quantity} {item.unit}</span><strong>{formatMoney(item.line_total)}</strong></div>)}</div>
               <div className="cart-total"><span>Разом</span><strong>{formatMoney(order.total)}</strong></div>
-              <button className="button button-outline" type="button" onClick={() => { setSelectedReceipt(order); window.setTimeout(() => window.print(), 50) }}><ReceiptText size={16} /> Переглянути / друкувати квитанцію <Printer size={15} /></button>
+              <button className="button button-outline" type="button" onClick={() => setSelectedReceipt(order)}><ReceiptText size={16} /> Переглянути квитанцію <Printer size={15} /></button>
               {order.status === 'Нове' && order.payment_status !== 'Оплачено' && (
                 <button className="button button-outline cancel-order-button" type="button" disabled={busy} onClick={() => void cancelOrder(order)}>
                   <XCircle size={16} /> Відмовитися від замовлення
@@ -165,25 +274,48 @@ export function AccountPage() {
             </article>
           ))}</div>
         )}
-        {selectedReceipt && <Receipt order={selectedReceipt} customer={customer} />}
       </div>
+      {selectedReceipt && <Receipt
+        order={selectedReceipt}
+        customer={customer}
+        receiptRef={receiptRef}
+        onPrint={printReceipt}
+        onClose={() => setSelectedReceipt(null)}
+      />}
     </section>
   )
 }
 
-function Receipt({ order, customer }: { order: CustomerOrder; customer: Customer }) {
+function Receipt({
+  order, customer, receiptRef, onPrint, onClose,
+}: {
+  order: CustomerOrder
+  customer: Customer
+  receiptRef: RefObject<HTMLDivElement | null>
+  onPrint: () => void
+  onClose: () => void
+}) {
   return (
-    <section className="receipt-print" aria-label="Квитанція замовлення">
-      <div className="receipt-brand">прометей <small>магазин добрих продуктів</small></div>
-      <h1>Квитанція замовлення №{order.id}</h1>
-      <p>{formatDate(order.created_at)}</p>
-      <p>Покупець: {customer.name}<br />{customer.email}<br />Місто доставки: {order.city}</p>
-      <hr />
-      {order.items.map((item, index) => <div className="receipt-line" key={`${item.product_name}-${index}`}><span>{item.product_name} · {item.quantity} {item.unit} × {formatMoney(item.unit_price)}</span><strong>{formatMoney(item.line_total)}</strong></div>)}
-      <hr />
-      <div className="receipt-line receipt-grand-total"><strong>Разом</strong><strong>{formatMoney(order.total)}</strong></div>
-      <p>Оплата: {order.payment_status}<br />Статус: {order.status}</p>
-      <p>Квитанція підтверджує онлайн-замовлення й не є фіскальним чеком.</p>
-    </section>
+    <div className="receipt-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="receipt-dialog" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+        <div className="receipt-toolbar"><strong>Квитанція замовлення</strong><button className="icon-button" type="button" aria-label="Закрити квитанцію" onClick={onClose}><X size={18} /></button></div>
+        <div className="receipt-paper" ref={receiptRef}>
+          <header className="receipt-heading">
+            <div className="receipt-brand"><span className="brand-mark">п</span><span><strong>прометей</strong><small>магазин добрих продуктів</small></span></div>
+            <span className="receipt-label">КВИТАНЦІЯ ОНЛАЙН-ЗАМОВЛЕННЯ</span>
+          </header>
+          <div className="receipt-title-row"><div><span className="eyebrow">ДЯКУЄМО ЗА ПОКУПКУ</span><h1 id="receipt-title">Замовлення №{order.id}</h1></div><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'badge-green'}`}>{order.status}</span></div>
+          <div className="receipt-meta"><span>Дата оформлення<strong>{formatDate(order.created_at)}</strong></span><span>Місто доставки<strong>{order.city}</strong></span></div>
+          <div className="receipt-customer"><span className="eyebrow">ПОКУПЕЦЬ</span><strong>{order.customer_name || customer.name}</strong><span>{customer.email}</span><span>{order.phone || customer.phone}</span></div>
+          <table className="receipt-table"><thead><tr><th>Товар</th><th>Кількість</th><th>Ціна</th><th>Сума</th></tr></thead><tbody>
+            {order.items.map((item, index) => <tr key={`${item.product_name}-${index}`}><td>{item.product_name}</td><td>{item.quantity} {item.unit}</td><td>{formatMoney(item.unit_price)}</td><td>{formatMoney(item.line_total)}</td></tr>)}
+          </tbody></table>
+          <div className="receipt-total"><span>Усього до сплати</span><strong>{formatMoney(order.total)}</strong></div>
+          <div className="receipt-payment"><span>Оплата</span><strong>{order.status === 'Скасовано' ? 'Не оплачено · замовлення скасовано' : order.payment_status}</strong></div>
+          <footer className="receipt-footnote">Квитанція підтверджує онлайн-замовлення й не є фіскальним чеком.</footer>
+        </div>
+        <div className="receipt-actions"><button className="button button-outline" type="button" onClick={onClose}>Закрити</button><button className="button button-dark" type="button" onClick={onPrint}><Printer size={16} /> Друкувати / зберегти PDF</button></div>
+      </section>
+    </div>
   )
 }

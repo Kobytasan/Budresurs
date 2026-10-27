@@ -20,6 +20,7 @@ export interface Customer {
   email: string
   phone: string
   city: string
+  avatar_url?: string | null
 }
 
 export interface StaffUser {
@@ -47,6 +48,9 @@ export interface CustomerOrder {
   status: string
   payment_status: string
   city: string
+  customer_name?: string
+  phone?: string
+  address?: string
   items: OrderItem[]
 }
 
@@ -60,6 +64,7 @@ export interface AdminOrder {
   address?: string
   status?: string
   city?: string
+  items: OrderItem[]
 }
 
 export interface Supplier {

@@ -116,7 +116,7 @@ async function currentCustomer(req) {
   const token = getCookie(req, 'prometey_customer_session')
   if (!token) return null
   const { rows } = await pool.query(
-    `SELECT c.id, c.name, c.email, c.phone, c.city
+    `SELECT c.id, c.name, c.email, c.phone, c.city, c.avatar_url
      FROM customer_sessions s JOIN customers c ON c.id = s.customer_id
      WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
     [tokenHash(token)],
@@ -224,10 +224,12 @@ async function initDB() {
       id BIGSERIAL PRIMARY KEY, email VARCHAR(254) UNIQUE,
       name VARCHAR(100) NOT NULL, phone VARCHAR(20) NOT NULL UNIQUE,
       password_hash TEXT, city VARCHAR(80) NOT NULL DEFAULT 'Київ',
+      avatar_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     ALTER TABLE customers ADD COLUMN IF NOT EXISTS email VARCHAR(254);
     ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash TEXT;
+    ALTER TABLE customers ADD COLUMN IF NOT EXISTS avatar_url TEXT;
     ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     CREATE UNIQUE INDEX IF NOT EXISTS customers_email_unique ON customers (LOWER(email)) WHERE email IS NOT NULL;
 
@@ -492,7 +494,7 @@ app.post('/api/customer/register', async (req, res, next) => {
     )
     if (!insert.rowCount) return apiError(res, 409, 'Обліковий запис із цією поштою або телефоном вже існує.')
     const { rows } = await pool.query(
-      'SELECT id, name, email, phone, city FROM customers WHERE id = $1',
+      'SELECT id, name, email, phone, city, avatar_url FROM customers WHERE id = $1',
       [insert.rows[0].id],
     )
     await issueSession(req, res, 'customer_sessions', 'customer_id', rows[0].id, 'prometey_customer_session')
@@ -516,7 +518,7 @@ app.post('/api/customer/login', async (req, res, next) => {
       return apiError(res, 401, 'Невірна електронна пошта або пароль.')
     }
     await issueSession(req, res, 'customer_sessions', 'customer_id', customer.id, 'prometey_customer_session')
-    res.json({ customer: { id: customer.id, name: customer.name, email: customer.email, phone: customer.phone, city: customer.city } })
+    res.json({ customer: { id: customer.id, name: customer.name, email: customer.email, phone: customer.phone, city: customer.city, avatar_url: customer.avatar_url } })
   } catch (error) { next(error) }
 })
 
@@ -525,6 +527,70 @@ app.get('/api/customer/me', async (req, res, next) => {
     const customer = await currentCustomer(req)
     if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
     res.json({ customer })
+  } catch (error) { next(error) }
+})
+
+app.patch('/api/customer/profile', async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    const payload = req.body || {}
+    if (Object.keys(payload).some((key) => !['name', 'email', 'phone', 'city'].includes(key))
+      || Object.keys(payload).length !== 4) {
+      return apiError(res, 400, 'Перевірте дані профілю.')
+    }
+    const name = text(payload.name, 100)
+    const email = text(payload.email, 254).toLowerCase()
+    const phone = text(payload.phone, 20)
+    const city = payload.city
+    if (name.length < 2 || !validEmail(email)
+      || !/^[+0-9()\-\s]{9,20}$/.test(phone) || !DELIVERY_CITIES.includes(city)) {
+      return apiError(res, 400, 'Перевірте ім’я, пошту, телефон і місто.')
+    }
+    const result = await pool.query(
+      `UPDATE customers SET name = $1, email = $2, phone = $3, city = $4
+       WHERE id = $5 RETURNING id, name, email, phone, city, avatar_url`,
+      [name, email, phone, city, customer.id],
+    )
+    res.json({ customer: result.rows[0] })
+  } catch (error) {
+    if (error.code === '23505') return apiError(res, 409, 'Ця електронна пошта або телефон уже використовується іншим обліковим записом.')
+    next(error)
+  }
+})
+
+app.put('/api/customer/avatar', express.text({ type: 'text/plain', limit: '1.4mb' }), async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    const match = typeof req.body === 'string'
+      ? /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(req.body)
+      : null
+    if (!match) return apiError(res, 400, 'Завантажте зображення PNG, JPG або WebP.')
+    const image = Buffer.from(match[2], 'base64')
+    const validSignature = match[1] === 'png'
+      ? image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      : match[1] === 'jpeg'
+        ? image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff
+        : image.subarray(0, 4).toString() === 'RIFF' && image.subarray(8, 12).toString() === 'WEBP'
+    if (!image.length || image.length > 1024 * 1024 || !validSignature) {
+      return apiError(res, 400, 'Фото має бути справжнім зображенням PNG, JPG або WebP розміром до 1 МБ.')
+    }
+    const avatarUrl = `data:image/${match[1]};base64,${image.toString('base64')}`
+    const result = await pool.query(
+      'UPDATE customers SET avatar_url = $1 WHERE id = $2 RETURNING avatar_url',
+      [avatarUrl, customer.id],
+    )
+    res.json({ avatar_url: result.rows[0].avatar_url })
+  } catch (error) { next(error) }
+})
+
+app.delete('/api/customer/avatar', async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
+    await pool.query('UPDATE customers SET avatar_url = NULL WHERE id = $1', [customer.id])
+    res.json({ avatar_url: null })
   } catch (error) { next(error) }
 })
 
@@ -589,6 +655,7 @@ app.get('/api/customer/orders', async (req, res, next) => {
     if (!customer) return apiError(res, 401, 'Увійдіть до особистого кабінету.')
     const { rows } = await pool.query(
       `SELECT o.id, o.created_at, o.total, o.status, o.payment_status, o.city,
+       o.customer_name, o.phone, o.address,
        COALESCE(json_agg(json_build_object(
          'product_name', i.product_name, 'unit', i.unit, 'unit_price', i.unit_price,
          'quantity', i.quantity, 'line_total', i.unit_price * i.quantity
@@ -758,9 +825,17 @@ app.get('/api/admin/orders', async (req, res, next) => {
     const user = await requireUser(req, res, ['director', 'accountant'])
     if (!user) return
     const fields = user.role === 'director'
-      ? 'id, created_at, total, payment_status, customer_name, phone, address, status, city'
-      : 'id, created_at, total, payment_status, status'
-    const { rows } = await pool.query(`SELECT ${fields} FROM orders ORDER BY id DESC LIMIT 100`)
+      ? 'o.id, o.created_at, o.total, o.payment_status, o.customer_name, o.phone, o.address, o.status, o.city'
+      : 'o.id, o.created_at, o.total, o.payment_status, o.status'
+    const { rows } = await pool.query(
+      `SELECT ${fields},
+       COALESCE(json_agg(json_build_object(
+         'product_name', i.product_name, 'unit', i.unit, 'unit_price', i.unit_price,
+         'quantity', i.quantity, 'line_total', i.unit_price * i.quantity
+       ) ORDER BY i.id) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+       FROM orders o LEFT JOIN order_items i ON i.order_id = o.id
+       GROUP BY o.id ORDER BY o.id DESC LIMIT 100`,
+    )
     res.json({ orders: rows })
   } catch (error) { next(error) }
 })

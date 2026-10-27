@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   BadgeDollarSign,
   Boxes,
@@ -6,6 +6,8 @@ import {
   ArrowRight,
   CalendarClock,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleHelp,
   LayoutDashboard,
   LogOut,
@@ -514,13 +516,41 @@ function FinancePanel({
   onChange: (order: AdminOrder, field: 'status' | 'payment_status', value: string) => Promise<void>
 }) {
   const totals = overview?.financials
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null)
   return (
     <>
       <SectionHeader eyebrow="ФІНАНСИ" title="Фінансовий журнал" description="Підсумки замовлень і статуси оплат." />
       <div className="stat-grid stat-grid-four"><Stat label="Замовлень" value={String(totals?.order_count ?? 0)} icon={<BriefcaseBusiness />} /><Stat label="Сума" value={formatMoney(totals?.revenue ?? 0)} icon={<BadgeDollarSign />} /><Stat label="Отримано" value={formatMoney(totals?.paid ?? 0)} icon={<Check />} tone="green" /><Stat label="До отримання" value={formatMoney(totals?.due ?? 0)} icon={<CalendarClock />} tone="warning" /></div>
       <div className="panel-card table-panel"><div className="panel-heading"><div><h2>Останні замовлення</h2><p>{role === 'accountant' ? 'Бухгалтерський доступ: контакти покупців приховано' : 'Статуси, суми та інформація про доставку'}</p></div></div>
-        {orders.length === 0 ? <p className="empty-inline">Замовлень поки немає.</p> : <div className="table-scroll"><table><thead><tr><th>№</th><th>Дата</th>{role === 'director' && <><th>Покупець</th><th>Місто</th></>}<th>Сума</th><th>Оплата</th>{role === 'director' && <th>Замовлення</th>}</tr></thead><tbody>
-          {orders.map((order) => <tr key={order.id}><td><strong>#{order.id}</strong></td><td>{formatDate(order.created_at)}</td>{role === 'director' && <><td>{order.customer_name}<small className="cell-subtitle">{order.phone}</small></td><td>{order.city}</td></>}<td><strong>{formatMoney(order.total)}</strong></td><td><select aria-label={`Статус оплати замовлення ${order.id}`} value={order.payment_status} disabled={busy || order.status === 'Скасовано'} onChange={(event) => void onChange(order, 'payment_status', event.target.value)}><option>Очікує оплати</option><option>Оплачено</option></select></td>{role === 'director' && <td>{order.status === 'Скасовано' ? <span className="badge badge-muted">Скасовано</span> : <select aria-label={`Статус замовлення ${order.id}`} value={order.status || 'Нове'} disabled={busy} onChange={(event) => void onChange(order, 'status', event.target.value)}><option>Нове</option><option>Комплектується</option><option>Доставляється</option><option>Виконано</option></select>}</td>}</tr>)}
+        {orders.length === 0 ? <p className="empty-inline">Замовлень поки немає.</p> : <div className="table-scroll"><table><thead><tr><th>№ замовлення</th><th>Дата</th>{role === 'director' && <><th>Покупець</th><th>Місто</th></>}<th>Сума</th><th>Оплата</th>{role === 'director' && <th>Статус</th>}</tr></thead><tbody>
+          {orders.map((order) => {
+            const expanded = expandedOrderId === order.id
+            return <Fragment key={order.id}>
+              <tr key={order.id}>
+                <td><button className="order-open-button" type="button" aria-expanded={expanded} onClick={() => setExpandedOrderId(expanded ? null : order.id)}>
+                  <strong>№{order.id}</strong>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button></td>
+                <td>{formatDate(order.created_at)}</td>
+                {role === 'director' && <><td>{order.customer_name}<small className="cell-subtitle">{order.phone}</small></td><td>{order.city}</td></>}
+                <td><strong>{formatMoney(order.total)}</strong></td>
+                <td><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : order.payment_status === 'Оплачено' ? 'badge-green' : 'badge-muted'}`}>{order.status === 'Скасовано' && order.payment_status !== 'Оплачено' ? 'Не оплачено · скасовано' : order.payment_status}</span></td>
+                {role === 'director' && <td><span className={`badge ${order.status === 'Скасовано' ? 'badge-muted' : 'status-badge-white'}`}>{order.status || 'Нове'}</span></td>}
+              </tr>
+              {expanded && <tr className="order-details-row"><td colSpan={role === 'director' ? 7 : 4}>
+                <div className="order-detail-panel">
+                  <div className="order-detail-heading"><div><strong>Замовлення №{order.id}</strong><small>{formatDate(order.created_at)}</small></div><strong>{formatMoney(order.total)}</strong></div>
+                  {role === 'director' && <div className="order-customer-details"><span><small>Покупець</small>{order.customer_name}</span><span><small>Телефон</small>{order.phone}</span><span><small>Місто</small>{order.city}</span><span><small>Адреса</small>{order.address}</span></div>}
+                  <div className="order-detail-items"><strong>Склад замовлення</strong>{order.items.map((item, index) => <div key={`${item.product_name}-${index}`}><span>{item.product_name} · {item.quantity} {item.unit} × {formatMoney(item.unit_price)}</span><strong>{formatMoney(item.line_total)}</strong></div>)}</div>
+                  <div className="order-detail-controls">
+                    <label>Оплата<select aria-label={`Статус оплати замовлення ${order.id}`} value={order.payment_status} disabled={busy || order.status === 'Скасовано'} onChange={(event) => void onChange(order, 'payment_status', event.target.value)}><option>Очікує оплати</option><option>Оплачено</option></select></label>
+                    {role === 'director' && <label>Статус замовлення{order.status === 'Скасовано'
+                      ? <span className="badge badge-muted">Скасовано</span>
+                      : <select aria-label={`Статус замовлення ${order.id}`} value={order.status || 'Нове'} disabled={busy} onChange={(event) => void onChange(order, 'status', event.target.value)}><option>Нове</option><option>Комплектується</option><option>Доставляється</option><option>Виконано</option></select>}</label>}
+                  </div>
+                </div>
+              </td></tr>}
+            </Fragment>
+          })}
         </tbody></table></div>}
       </div>
     </>
@@ -577,7 +607,7 @@ function StaffRow({
 }) {
   const [role, setRole] = useState<StaffRole>(record.role)
   const [active, setActive] = useState(record.active)
-  return <tr><td><strong>{record.name}</strong><small className="cell-subtitle">{record.username}</small></td><td><select value={role} disabled={record.role === 'director'} onChange={(event) => setRole(event.target.value as StaffRole)}><option value="director">Директор</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option></select></td><td><span className="badge status-badge-white">{record.work_status}</span></td><td><label className="switch-label"><input type="checkbox" checked={active} disabled={record.id === currentUserId} onChange={(event) => setActive(event.target.checked)} />{active ? 'Активний' : 'Вимкнений'}</label></td><td><div className="team-row-actions"><button className="button button-outline compact-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onUpdate(record, role, active)}>Зберегти</button>{record.role !== 'director' && <button className="button button-outline team-delete-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onDelete(record)}><Trash2 size={14} /> Видалити</button>}</div></td></tr>
+  return <tr><td><strong>{record.name}</strong><small className="cell-subtitle">{record.username}</small></td><td><select value={role} disabled={record.role === 'director'} onChange={(event) => setRole(event.target.value as StaffRole)}><option value="director">Директор</option><option value="accountant">Бухгалтер</option><option value="inventory">Працівник складу</option></select></td><td><span className="badge status-badge-white">{record.work_status}</span></td><td><div className="team-access-control"><span className={`badge ${active ? 'status-badge-white' : 'badge-muted'}`}>{active ? record.role === 'director' ? 'Повний доступ' : 'Доступ надано' : 'Доступ вимкнено'}</span><button className="access-toggle" type="button" disabled={busy || record.id === currentUserId} onClick={() => setActive((value) => !value)}>{active ? 'Вимкнути' : 'Увімкнути'}</button></div></td><td><div className="team-row-actions"><button className="button button-outline compact-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onUpdate(record, role, active)}>Зберегти</button>{record.role !== 'director' && <button className="button button-outline team-delete-button" type="button" disabled={busy || record.id === currentUserId} onClick={() => void onDelete(record)}><Trash2 size={14} /> Видалити</button>}</div></td></tr>
 }
 
 function HistoryPanel({ history }: { history: StatusHistoryEntry[] }) {
