@@ -257,6 +257,15 @@ async function initDB() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (customer_id, product_sku)
     );
+    CREATE TABLE IF NOT EXISTS product_reviews (
+      id BIGSERIAL PRIMARY KEY,
+      product_sku VARCHAR(50) NOT NULL REFERENCES products(sku) ON DELETE CASCADE,
+      customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      rating SMALLINT NOT NULL CHECK(rating BETWEEN 1 AND 5),
+      comment VARCHAR(1500) NOT NULL CHECK(length(trim(comment)) >= 5),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (product_sku, customer_id)
+    );
     CREATE TABLE IF NOT EXISTS orders (
       id BIGSERIAL PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       customer_name VARCHAR(100) NOT NULL DEFAULT '', phone VARCHAR(20) NOT NULL DEFAULT '',
@@ -416,6 +425,65 @@ app.get('/api/products', async (req, res, next) => {
        FROM products WHERE active = TRUE ORDER BY category, name`,
     )
     res.json({ products: rows })
+  } catch (error) { next(error) }
+})
+
+async function productReviewPayload(sku, customerId) {
+  const [summary, reviews, ownReview] = await Promise.all([
+    pool.query(
+      'SELECT COALESCE(AVG(rating), 0)::numeric(3,1) AS average_rating, COUNT(*)::int AS review_count FROM product_reviews WHERE product_sku = $1',
+      [sku],
+    ),
+    pool.query(
+      `SELECT r.id, c.name, r.rating, r.comment, r.created_at,
+       (r.customer_id = $2) AS mine
+       FROM product_reviews r JOIN customers c ON c.id = r.customer_id
+       WHERE r.product_sku = $1 ORDER BY r.created_at DESC LIMIT 100`,
+      [sku, customerId || 0],
+    ),
+    customerId
+      ? pool.query(
+        'SELECT r.id, c.name, r.rating, r.comment, r.created_at, TRUE AS mine FROM product_reviews r JOIN customers c ON c.id = r.customer_id WHERE r.product_sku = $1 AND r.customer_id = $2',
+        [sku, customerId],
+      )
+      : Promise.resolve({ rows: [] }),
+  ])
+  return {
+    average_rating: Number(summary.rows[0].average_rating),
+    review_count: summary.rows[0].review_count,
+    reviews: reviews.rows,
+    mine: ownReview.rows[0] || null,
+  }
+}
+
+app.get('/api/products/:sku/reviews', async (req, res, next) => {
+  try {
+    const product = await pool.query('SELECT 1 FROM products WHERE sku = $1 AND active', [req.params.sku])
+    if (!product.rowCount) return apiError(res, 404, 'Товар не знайдено.')
+    const customer = await currentCustomer(req)
+    res.json(await productReviewPayload(req.params.sku, customer?.id || null))
+  } catch (error) { next(error) }
+})
+
+app.post('/api/products/:sku/reviews', async (req, res, next) => {
+  try {
+    const customer = await currentCustomer(req)
+    if (!customer) return apiError(res, 401, 'Увійдіть до кабінету, щоб залишити відгук.')
+    const rating = req.body?.rating
+    const comment = text(req.body?.comment, 1500)
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5 || comment.length < 5) {
+      return apiError(res, 400, 'Оберіть оцінку від 1 до 5 та напишіть відгук щонайменше з 5 символів.')
+    }
+    const product = await pool.query('SELECT 1 FROM products WHERE sku = $1 AND active', [req.params.sku])
+    if (!product.rowCount) return apiError(res, 404, 'Товар не знайдено.')
+    await pool.query(
+      `INSERT INTO product_reviews (product_sku, customer_id, rating, comment)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (product_sku, customer_id)
+       DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, created_at = NOW()`,
+      [req.params.sku, customer.id, rating, comment],
+    )
+    res.json(await productReviewPayload(req.params.sku, customer.id))
   } catch (error) { next(error) }
 })
 

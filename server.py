@@ -151,6 +151,15 @@ def init_db():
                 customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
                 expires_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS product_reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_sku TEXT NOT NULL REFERENCES products(sku) ON DELETE CASCADE,
+                customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+                rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                comment TEXT NOT NULL CHECK(length(trim(comment)) >= 5),
+                created_at TEXT NOT NULL,
+                UNIQUE(product_sku, customer_id)
+            );
             CREATE TABLE IF NOT EXISTS orders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TEXT NOT NULL,
@@ -408,6 +417,8 @@ class StoreHandler(BaseHTTPRequestHandler):
                        FROM products WHERE active = 1 ORDER BY category, name"""
                 ).fetchall()
             return self.send_json(200, {"products": [dict(row) for row in products]})
+        if path.startswith("/api/products/") and path.endswith("/reviews"):
+            return self.product_reviews(path[len("/api/products/"):-len("/reviews")].strip("/"))
         if path == "/api/cities":
             return self.send_json(200, {"cities": sorted(DELIVERY_CITIES)})
         if path == "/api/auth/me":
@@ -460,6 +471,8 @@ class StoreHandler(BaseHTTPRequestHandler):
             return self.customer_logout()
         if path == "/api/orders":
             return self.create_order()
+        if path.startswith("/api/products/") and path.endswith("/reviews"):
+            return self.save_product_review(path[len("/api/products/"):-len("/reviews")].strip("/"))
         if path == "/api/support":
             return self.create_support_message()
         if path == "/api/admin/suppliers":
@@ -973,6 +986,75 @@ class StoreHandler(BaseHTTPRequestHandler):
         return self.send_json(
             201, {"order_id": order_id, "total": total, "message": "Замовлення прийнято!"}
         )
+
+    def product_reviews(self, sku):
+        with get_db() as db:
+            product = db.execute(
+                "SELECT 1 FROM products WHERE sku = ? AND active = 1", (sku,)
+            ).fetchone()
+            if not product:
+                return self.send_json(404, {"error": "Товар не знайдено."})
+            customer = self.current_customer()
+            summary = db.execute(
+                """SELECT COALESCE(AVG(rating), 0) AS average_rating,
+                          COUNT(*) AS review_count
+                   FROM product_reviews WHERE product_sku = ?""",
+                (sku,),
+            ).fetchone()
+            rows = db.execute(
+                """SELECT reviews.id, customers.name, reviews.rating,
+                          reviews.comment, reviews.created_at,
+                          (reviews.customer_id = ?) AS mine
+                   FROM product_reviews AS reviews
+                   JOIN customers ON customers.id = reviews.customer_id
+                   WHERE reviews.product_sku = ?
+                   ORDER BY reviews.created_at DESC LIMIT 100""",
+                (customer["id"] if customer else None, sku),
+            ).fetchall()
+            mine = next((dict(row) for row in rows if row["mine"]), None)
+            return self.send_json(200, {
+                "average_rating": round(summary["average_rating"], 1),
+                "review_count": summary["review_count"],
+                "reviews": [dict(row) for row in rows],
+                "mine": mine,
+            })
+
+    def save_product_review(self, sku):
+        customer = self.current_customer()
+        if not customer:
+            return self.send_json(401, {"error": "Увійдіть до кабінету, щоб залишити відгук."})
+        try:
+            payload = self.read_json()
+        except ValueError as error:
+            return self.send_json(400, {"error": str(error)})
+        rating = payload.get("rating")
+        comment = payload.get("comment")
+        if (
+            type(rating) is not int
+            or not 1 <= rating <= 5
+            or not isinstance(comment, str)
+            or not 5 <= len(comment.strip()) <= 1500
+        ):
+            return self.send_json(
+                400,
+                {"error": "Оберіть оцінку від 1 до 5 та напишіть відгук щонайменше з 5 символів."},
+            )
+        with get_db() as db:
+            product = db.execute(
+                "SELECT 1 FROM products WHERE sku = ? AND active = 1", (sku,)
+            ).fetchone()
+            if not product:
+                return self.send_json(404, {"error": "Товар не знайдено."})
+            db.execute(
+                """INSERT INTO product_reviews
+                   (product_sku, customer_id, rating, comment, created_at)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(product_sku, customer_id)
+                   DO UPDATE SET rating = excluded.rating, comment = excluded.comment,
+                                 created_at = excluded.created_at""",
+                (sku, customer["id"], rating, comment.strip(), utc_now()),
+            )
+        return self.product_reviews(sku)
 
     def create_support_message(self):
         try:

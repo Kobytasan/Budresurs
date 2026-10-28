@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { api, jsonBody } from '../api'
 import { useStore } from '../contexts/StoreContext'
+import { getProductMedia } from '../productMedia'
 import type { Product } from '../types'
 
 export const money = new Intl.NumberFormat('uk-UA', {
@@ -301,7 +302,9 @@ export function ProductArt({ product, compact = false }: { product: Product; com
 
   return (
     <div className={`product-art-box ${product.color}${compact ? ' compact' : ''}`}>
-      <Icon className="product-tool-icon" strokeWidth={1.45} aria-hidden="true" />
+      {compact
+        ? <img className="product-thumb-image" src={getProductMedia(product).src} alt="" loading="lazy" />
+        : <Icon className="product-tool-icon" strokeWidth={1.45} aria-hidden="true" />}
     </div>
   )
 }
@@ -328,7 +331,9 @@ export function ProductCard({ product }: { product: Product }) {
     <article className="product-card">
       <div className={`product-visual ${product.color}`}>
         <span className="product-category">{product.category_name}</span>
-        <ProductArt product={product} />
+        <Link className="product-photo-link" to={`/products/${encodeURIComponent(product.sku)}`} aria-label={`Детальніше про товар: ${product.name}`}>
+          <img className="product-photo" src={getProductMedia(product).src} alt={product.name} loading="lazy" />
+        </Link>
         <button
           className={`favorite-button${isFavorite ? ' active' : ''}`}
           type="button"
@@ -346,7 +351,7 @@ export function ProductCard({ product }: { product: Product }) {
         ><Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} /></button>
       </div>
       <div className="product-info">
-        <h3>{product.name}</h3>
+        <h3><Link to={`/products/${encodeURIComponent(product.sku)}`}>{product.name}</Link></h3>
         <p>{product.description}</p>
         {unavailable && <span className="stock-unavailable">Немає в наявності</span>}
         <div className="product-meta">
@@ -362,6 +367,7 @@ export function ProductCard({ product }: { product: Product }) {
               {unavailable ? 'Немає' : '+'}
             </button>
           )}
+          <Link className="product-details-link" to={`/products/${encodeURIComponent(product.sku)}`}>Фото, відгуки та порівняння <ArrowRight size={14} /></Link>
         </div>
         {quantity > 0 && (
           <small className={quantity > product.stock ? 'quantity-limit-note stock-shortage' : 'quantity-limit-note'}>

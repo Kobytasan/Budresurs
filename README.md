@@ -6,6 +6,8 @@
 
 - Адаптивний каталог із пошуком і категоріями: електроінструмент, ручний інструмент, вимірювальні прилади, кріплення й оснащення, засоби захисту, драбини.
 - Перегляд цін, описів і актуальних складських залишків.
+- Окрема сторінка товару з фотографією, характеристиками, порівнянням, схожими товарами та оцінками покупців.
+- Відгук на товар можна залишити після входу до кабінету; покупець може редагувати власний відгук.
 - Кошик, оформлення замовлення та перевірка залишків на сервері.
 - Обране, профіль користувача, історія замовлень і квитанції.
 - Робочий кабінет із розподілом доступу за ролями: директор, менеджер продажу, бухгалтер і працівник складу.
@@ -90,6 +92,7 @@ Start Command: node server/server.js
 |---|---|
 | `/` | Головна сторінка «Будресурс» |
 | `/products` | Пошук і перегляд каталогу |
+| `/products/:sku` | Фото, опис, характеристики, порівняння та відгуки про товар |
 | `/about` | Інформація про проєкт |
 | `/support` | Форма звернення |
 | `/account` | Вхід, реєстрація та кабінет користувача |
@@ -99,6 +102,8 @@ Start Command: node server/server.js
 
 - `src/pages/PublicPages.tsx` — головна, каталог, інформаційна сторінка та звернення.
 - `src/components/Storefront.tsx` — публічна навігація, кошик і картки каталогу.
+- `src/pages/ProductPage.tsx` — детальна сторінка товару та відгуки.
+- `src/productMedia.ts` і `public/images/products/` — фотографії, джерела та атрибуція.
 - `src/pages/AccountPage.tsx` — кабінет користувача та квитанції.
 - `src/pages/StaffPage.tsx` — робочий кабінет команди.
 - `src/index.css` — стилі та адаптивна тема.
@@ -107,3 +112,31 @@ Start Command: node server/server.js
 - `server.py` — альтернативний локальний сервер на SQLite.
 
 Проєкт призначений для навчання та тестування каталогу й замовлень. Перед реальним використанням перевірте правила доставки й оплати, налаштуйте резервне копіювання бази та зберігайте облікові дані тільки в захищених змінних середовища.
+
+## Джерела фотографій
+
+Фотографії товарів завантажені локально з Wikimedia Commons; для товарів, де точна модель на знімку може відрізнятися, сторінка позначає зображення як ілюстративне. Посилання ведуть на сторінки файлів із повними умовами використання.
+
+| Товар | Автор | Ліцензія | Джерело |
+|---|---|---|---|
+| Акумуляторний дриль | Tony Webster | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Black_and_Decker_20-Volt_Power_Drill_(49112921413).jpg) |
+| Набір свердел | Ildar Sagdejev (Specious) | CC BY-SA 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:2010-01-21_Craftsman_Professional_cobalt_drill_bit_set.jpg) |
+| Перфоратор | toolstop | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Black_%26_Decker_P80-38_Rotary_Hammer_Drill_1.jpg) |
+| Набір комбінованих ключів | Ildar Sagdejev (Specious) | CC BY-SA 3.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:2008-04-14_Chrome-Vanadium_Wrenches.jpg) |
+| Пасатижі | Evan-Amos | Public domain | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tool-pliers.jpg) |
+| Набір викруток | Pittigrilli | CC BY 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Screwdriver_set_with_great_variety_of_bits_and_ratchet_screwdriver.jpg) |
+| Лазерний рівень | Billbeee at English Wikipedia | CC BY 2.5 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Laser-Level.jpg) |
+| Бульбашковий рівень | Dmitry Makeev | CC BY-SA 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Waterpass.jpg) |
+| Саморіз | Wp-0001 | CC BY 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Fetter-thread_lag_screw_with_full_point.jpg) |
+| Анкерний болт | Dmitry G | CC BY-SA 3.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ancor_bolt_for_concrete.JPG) |
+| Кутова шліфмашина | Adygrafix250 | CC BY-SA 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:A_welder_using_an_angle_grinder_to_grind_steel.jpg) |
+| Циркулярна пилка | Mark Hunter | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:DeWalt_circular_saw.jpg) |
+| Молоток | James Bowe | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Hammer_(6371964415).jpg) |
+| Рулетка | Nenad Stojkovic | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:A_pair_of_hands_holding_a_construction_measuring_tape.jpg) |
+| Каска захисна | CEphoto, Uwe Aranas | CC BY-SA 3.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Cologne_Germany_Safety-helmet-with-headset-01.jpg) |
+| Захисні окуляри | DJSparky | CC BY-SA 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Safety_Eyewear.jpg) |
+| Робочі рукавиці | Joost J. Bakker IJmuiden | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ansell_Edmont_Industrial_Neoprene_Neatop_75_29-50_Gloves_Sol-Vex_U.S.D.A._Accepted_Madi_in_Malaysia_(51879455310).jpg) |
+| Драбина | Judgefloro | CC0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:1619Men_of_the_Philippines_with_aluminum_step_ladders_08.jpg) |
+| Драбина-стрем’янка | Amin | CC BY-SA 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ladder_aluminum.jpg) |
+| Подовжувач | Peter Lebbing | CC BY-SA 4.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Europlug_extension_cord.jpg) |
+| Будівельний майданчик | Sasha India | CC BY 2.0 | [Файл на Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Arequipa,_Peru_(36187196854).jpg) |

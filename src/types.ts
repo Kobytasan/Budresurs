@@ -14,6 +14,15 @@ export interface Product {
   stock: number
 }
 
+export interface ProductReview {
+  id: number
+  name: string
+  rating: number
+  comment: string
+  created_at: string
+  mine: boolean
+}
+
 export interface Customer {
   id: number
   name: string

@@ -3,6 +3,7 @@ import { StoreProvider } from './contexts/StoreContext'
 import { AccountPage } from './pages/AccountPage'
 import { AboutPage, CatalogPage, HomePage, SupportPage } from './pages/PublicPages'
 import { StaffPage } from './pages/StaffPage'
+import { ProductPage } from './pages/ProductPage'
 import { PublicLayout } from './components/Storefront'
 
 export function App() {
@@ -13,6 +14,7 @@ export function App() {
           <Route element={<PublicLayout />}>
             <Route index element={<HomePage />} />
             <Route path="products" element={<CatalogPage />} />
+            <Route path="products/:sku" element={<ProductPage />} />
             <Route path="account" element={<AccountPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="support" element={<SupportPage />} />
